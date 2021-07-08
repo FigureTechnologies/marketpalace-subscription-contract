@@ -5,7 +5,7 @@ use cosmwasm_std::{
 use provwasm_std::{mint_marker_supply, withdraw_coins, ProvenanceMsg, ProvenanceQuerier};
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, CapitalCall};
 use crate::state::{config, config_read, State, Status};
 
 fn contract_error(err: &str) -> ContractError {
@@ -29,6 +29,7 @@ pub fn instantiate(
         commitment_denom: msg.commitment_denom,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
+        min_days_of_notice: msg.min_days_of_notice,
         commitment: None,
         paid: None,
     };
@@ -122,7 +123,7 @@ pub fn try_issue_capital_call(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    capital_call: u64,
+    capital_call: CapitalCall,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -134,8 +135,12 @@ pub fn try_issue_capital_call(
         return Err(contract_error("only the raise contract can issue capital call"));
     }
 
-    if capital_call > state.remaining_commitment().unwrap_or(0) {
+    if capital_call.amount > state.remaining_commitment().unwrap_or(0) {
         return Err(contract_error("capital call larger than remaining commitment"));
+    }
+
+    if capital_call.days_of_notice < state.min_days_of_notice.unwrap_or(0) {
+        return Err(contract_error("not enough notice"))
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -300,6 +305,7 @@ mod tests {
             commitment_denom: String::from("stable_coin"),
             min_commitment: 10_000,
             max_commitment: 50_000,
+            min_days_of_notice: None,
         }
     }
 
