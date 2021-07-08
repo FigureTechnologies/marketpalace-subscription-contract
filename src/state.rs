@@ -22,6 +22,7 @@ pub struct State {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct CapitalCall {
+    pub issued_timestamp: u64,
     pub amount: u64,
     pub days_of_notice: Option<u16>,
     pub paid: bool,

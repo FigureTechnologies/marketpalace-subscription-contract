@@ -4,6 +4,8 @@ use cosmwasm_std::{
 };
 use provwasm_std::{mint_marker_supply, withdraw_coins, ProvenanceMsg, ProvenanceQuerier};
 
+use std::time::SystemTime;
+
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, CapitalCall};
 use crate::state::{config, config_read, State, Status};
@@ -146,6 +148,7 @@ pub fn try_issue_capital_call(
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.status = Status::Accepted;
         state.capital_calls.push(crate::state::CapitalCall {
+            issued_timestamp: SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs(),
             amount: capital_call.amount,
             days_of_notice: capital_call.days_of_notice,
             paid: false,
