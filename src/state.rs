@@ -14,6 +14,7 @@ pub struct State {
     pub admin: Addr,
     pub min_commitment: Coin,
     pub max_commitment: Coin,
+    pub commitment: Option<Coin>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

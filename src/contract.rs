@@ -28,6 +28,7 @@ pub fn instantiate(
         admin: msg.admin,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
+        commitment: Option::None,
     };
     config(deps.storage).save(&state)?;
 
@@ -98,6 +99,7 @@ pub fn try_accept(
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.status = Status::Accepted;
+        state.commitment = Option::Some(commitment);
         Ok(state)
     })?;
 
