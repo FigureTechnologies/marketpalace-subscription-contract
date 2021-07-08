@@ -18,8 +18,8 @@ pub struct State {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum Status {
     Proposed,
-    Contract_Accepted,
-    GP_Accepted,
+    ContractAccepted,
+    GPAccepted,
 }
 
 pub fn config(storage: &mut dyn Storage) -> Singleton<State> {

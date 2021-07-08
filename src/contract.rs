@@ -42,7 +42,7 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
-        HandleMsg::Contract_Accept {} => try_contract_accept(deps, _env, info),
+        HandleMsg::ContractAccept {} => try_contract_accept(deps, _env, info),
     }
 }
 
@@ -54,15 +54,15 @@ pub fn try_contract_accept(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Proposed {
-        return Err(contract_error("contract no longer proposed"))
+        return Err(contract_error("contract no longer proposed"));
     }
 
     if info.sender != state.raise_contract_address {
-        return Err(contract_error("only the raise contract can accept"))
+        return Err(contract_error("only the raise contract can accept"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.status = Status::Contract_Accepted;
+        state.status = Status::ContractAccepted;
         Ok(state)
     })?;
 
