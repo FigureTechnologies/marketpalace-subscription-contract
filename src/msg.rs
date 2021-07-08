@@ -5,18 +5,16 @@ use cosmwasm_std::{Addr, Coin};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub lp_capital_source: Addr,
+    pub raise_contract_address: Addr,
     pub admin: Addr,
-    pub capital: Coin,
-    pub shares: Coin,
+    pub min_commitment: Coin,
+    pub max_commitment: Coin,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Cancel {},
-    CommitCapital {},
-    CallCapital {},
+    Contract_Accept {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

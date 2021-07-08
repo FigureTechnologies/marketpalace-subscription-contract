@@ -9,19 +9,17 @@ pub static CONFIG_KEY: &[u8] = b"config";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
     pub status: Status,
-    pub gp: Addr,
-    pub lp_capital_source: Addr,
+    pub raise_contract_address: Addr,
     pub admin: Addr,
-    pub capital: Coin,
-    pub shares: Coin,
+    pub min_commitment: Coin,
+    pub max_commitment: Coin,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum Status {
-    PendingCapital,
-    Cancelled,
-    CapitalCommitted,
-    CapitalCalled,
+    Proposed,
+    Contract_Accepted,
+    GP_Accepted,
 }
 
 pub fn config(storage: &mut dyn Storage) -> Singleton<State> {
