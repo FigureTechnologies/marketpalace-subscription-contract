@@ -1,7 +1,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr, Coin, Storage};
+use cosmwasm_std::{Addr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
 pub static CONFIG_KEY: &[u8] = b"config";
@@ -12,9 +12,17 @@ pub struct State {
     pub status: Status,
     pub raise_contract_address: Addr,
     pub admin: Addr,
-    pub min_commitment: Coin,
-    pub max_commitment: Coin,
-    pub commitment: Option<Coin>,
+    pub commitment_denom: String,
+    pub min_commitment: u64,
+    pub max_commitment: u64,
+    pub commitment: Option<u64>,
+    pub paid: Option<u64>,
+}
+
+impl State {
+    pub fn remaining_commitment(&self) -> Option<u64> {
+        self.commitment.map(|commitment| commitment - self.paid.unwrap_or(0))
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

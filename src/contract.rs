@@ -26,9 +26,11 @@ pub fn instantiate(
         status: Status::Draft,
         raise_contract_address: msg.raise_contract_address,
         admin: msg.admin,
+        commitment_denom: msg.commitment_denom,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
-        commitment: Option::None,
+        commitment: None,
+        paid: None,
     };
     config(deps.storage).save(&state)?;
 
@@ -46,6 +48,7 @@ pub fn execute(
     match msg {
         HandleMsg::SubmitPending {} => try_submit_pending(deps, _env, info),
         HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
+        HandleMsg::IssueCapitalCall { capital_call } => try_issue_capital_call(deps, _env, info, capital_call),
     }
 }
 
@@ -81,25 +84,63 @@ pub fn try_accept(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    commitment: Coin,
+    commitment: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Pending {
+        return Err(contract_error("capital promise is not pending proposal"))
+    }
 
     if info.sender != state.raise_contract_address {
         return Err(contract_error("only the raise contract can accept"));
     }
 
-    if commitment.amount < state.min_commitment.amount {
+    if commitment < state.min_commitment {
         return Err(contract_error("commitment less than minimum"));
     }
 
-    if commitment.amount > state.max_commitment.amount {
+    if commitment > state.max_commitment {
         return Err(contract_error("commitment more than maximum"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.status = Status::Accepted;
         state.commitment = Option::Some(commitment);
+        Ok(state)
+    })?;
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_issue_capital_call(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    capital_call: u64,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Pending {
+        return Err(contract_error("capital promise is not accepted"))
+    }
+
+    if info.sender != state.raise_contract_address {
+        return Err(contract_error("only the raise contract can issue capital call"));
+    }
+
+    if capital_call > state.remaining_commitment().unwrap_or(0) {
+        return Err(contract_error("capital call larger than remaining commitment"));
+    }
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.status = Status::Accepted;
+        // save the cap call
         Ok(state)
     })?;
 

@@ -7,15 +7,17 @@ use cosmwasm_std::{Addr, Coin};
 pub struct InstantiateMsg {
     pub raise_contract_address: Addr,
     pub admin: Addr,
-    pub min_commitment: Coin,
-    pub max_commitment: Coin,
+    pub commitment_denom: String,
+    pub min_commitment: u64,
+    pub max_commitment: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     SubmitPending {},
-    Accept { commitment: Coin },
+    Accept { commitment: u64 },
+    IssueCapitalCall { capital_call: u64 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
