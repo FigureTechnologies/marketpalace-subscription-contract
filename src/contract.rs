@@ -84,6 +84,23 @@ pub fn try_accept(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
+    if info.sender != state.raise_contract_address {
+        return Err(contract_error("only the raise contract can accept"));
+    }
+
+    if commitment.amount < state.min_commitment.amount {
+        return Err(contract_error("commitment less than minimum"));
+    }
+
+    if commitment.amount > state.max_commitment.amount {
+        return Err(contract_error("commitment more than maximum"));
+    }
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.status = Status::Accepted;
+        Ok(state)
+    })?;
+
     Ok(Response {
         submessages: vec![],
         messages: vec![],
