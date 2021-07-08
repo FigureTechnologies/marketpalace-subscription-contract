@@ -15,6 +15,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     SubmitPending {},
+    Accept { commitment: Coin },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

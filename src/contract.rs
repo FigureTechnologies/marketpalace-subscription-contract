@@ -1,6 +1,6 @@
-use cosmwasm_std::StdError;
+
 use cosmwasm_std::{
-    entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
+    entry_point, to_binary, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError
 };
 use provwasm_std::{mint_marker_supply, withdraw_coins, ProvenanceMsg, ProvenanceQuerier};
 
@@ -44,6 +44,7 @@ pub fn execute(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
         HandleMsg::SubmitPending {} => try_submit_pending(deps, _env, info),
+        HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
     }
 }
 
@@ -66,6 +67,22 @@ pub fn try_submit_pending(
         state.status = Status::Pending;
         Ok(state)
     })?;
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_accept(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    commitment: Coin,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
 
     Ok(Response {
         submessages: vec![],
