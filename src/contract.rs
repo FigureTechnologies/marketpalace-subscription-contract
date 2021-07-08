@@ -23,7 +23,7 @@ pub fn instantiate(
 ) -> Result<Response, ContractError> {
     let state = State {
         owner: info.sender,
-        status: Status::Proposed,
+        status: Status::Draft,
         raise_contract_address: msg.raise_contract_address,
         admin: msg.admin,
         min_commitment: msg.min_commitment,
@@ -43,19 +43,19 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
-        HandleMsg::ContractAccept {} => try_contract_accept(deps, _env, info),
+        HandleMsg::SubmitPending {} => try_submit_pending(deps, _env, info),
     }
 }
 
-pub fn try_contract_accept(
+pub fn try_submit_pending(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
-    if state.status != Status::Proposed {
-        return Err(contract_error("contract no longer proposed"));
+    if state.status != Status::Draft {
+        return Err(contract_error("contract no longer draft"));
     }
 
     if info.sender != state.raise_contract_address {
@@ -63,7 +63,7 @@ pub fn try_contract_accept(
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.status = Status::ContractAccepted;
+        state.status = Status::Pending;
         Ok(state)
     })?;
 
@@ -237,7 +237,7 @@ mod tests {
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
         let status: Status = from_binary(&res).unwrap();
-        assert_eq!(Status::Proposed, status);
+        assert_eq!(Status::Draft, status);
     }
 
     // #[test]
