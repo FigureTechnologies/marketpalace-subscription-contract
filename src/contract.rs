@@ -31,7 +31,7 @@ pub fn instantiate(
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
         commitment: None,
-        paid: None,
+        capital_calls: vec![],
     };
     config(deps.storage).save(&state)?;
 
@@ -145,7 +145,11 @@ pub fn try_issue_capital_call(
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.status = Status::Accepted;
-        // save the cap call
+        state.capital_calls.push(crate::state::CapitalCall {
+            amount: capital_call.amount,
+            days_of_notice: capital_call.days_of_notice,
+            paid: false,
+        });
         Ok(state)
     })?;
 

@@ -17,12 +17,25 @@ pub struct State {
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,
     pub commitment: Option<u64>,
-    pub paid: Option<u64>,
+    pub capital_calls: Vec<CapitalCall>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct CapitalCall {
+    pub amount: u64,
+    pub days_of_notice: Option<u16>,
+    pub paid: bool,
 }
 
 impl State {
     pub fn remaining_commitment(&self) -> Option<u64> {
-        self.commitment.map(|commitment| commitment - self.paid.unwrap_or(0))
+        self.commitment.map(|commitment| commitment - self.paid())
+    }
+    
+    pub fn paid(&self) -> u64 {
+        self.capital_calls.iter()
+            .filter(|capital_call| capital_call.paid)
+            .fold(0, |sum, next| sum + next.amount)
     }
 }
 
