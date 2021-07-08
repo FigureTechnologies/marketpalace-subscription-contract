@@ -22,6 +22,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
+        owner: info.sender,
         status: Status::Proposed,
         raise_contract_address: msg.raise_contract_address,
         admin: msg.admin,
