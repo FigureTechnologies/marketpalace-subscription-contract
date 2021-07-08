@@ -297,8 +297,9 @@ mod tests {
         InstantiateMsg {
             raise_contract_address: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
             admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
-            min_commitment: Coin::new(10000, "stable_coin"),
-            max_commitment: Coin::new(50000, "stable_coin"),
+            commitment_denom: String::from("stable_coin"),
+            min_commitment: 10_000,
+            max_commitment: 50_000,
         }
     }
 
