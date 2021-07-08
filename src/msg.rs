@@ -24,7 +24,7 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct CapitalCall {
     pub amount: u64,
-    pub days_of_notice: u16,
+    pub days_of_notice: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

@@ -139,7 +139,7 @@ pub fn try_issue_capital_call(
         return Err(contract_error("capital call larger than remaining commitment"));
     }
 
-    if capital_call.days_of_notice < state.min_days_of_notice.unwrap_or(0) {
+    if capital_call.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
         return Err(contract_error("not enough notice"))
     }
 
