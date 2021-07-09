@@ -28,7 +28,7 @@ pub fn instantiate(
         status: Status::Draft,
         raise_contract_address: msg.raise_contract_address,
         admin: msg.admin,
-        capital_denom: msg.commitment_denom,
+        capital_denom: msg.capital_denom,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
@@ -49,7 +49,7 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
-        HandleMsg::SubmitPending {} => try_submit_pending(deps, _env, info),
+        HandleMsg::SubmitPendingReview {} => try_submit_pending(deps, _env, info),
         HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
         HandleMsg::IssueCapitalCall { capital_call } => try_issue_capital_call(deps, _env, info, capital_call),
     }
@@ -188,15 +188,14 @@ fn query_status(deps: Deps) -> StdResult<Status> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coins, from_binary, Addr, Coin, CosmosMsg};
-    use provwasm_mocks::{mock_dependencies, must_read_binary_file};
-    use provwasm_std::{Marker, MarkerMsgParams, ProvenanceMsgParams};
+    use cosmwasm_std::{from_binary, Addr};
+    use provwasm_mocks::{mock_dependencies};
 
     fn inst_msg() -> InstantiateMsg {
         InstantiateMsg {
             raise_contract_address: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
             admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
-            commitment_denom: String::from("stable_coin"),
+            capital_denom: String::from("stable_coin"),
             min_commitment: 10_000,
             max_commitment: 50_000,
             min_days_of_notice: None,
