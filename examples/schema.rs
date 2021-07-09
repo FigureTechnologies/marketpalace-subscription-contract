@@ -3,8 +3,8 @@ use std::fs::create_dir_all;
 
 use cosmwasm_schema::{export_schema, remove_schemas, schema_for};
 
-use marketpalace_capital_call_contract::msg::{HandleMsg, InstantiateMsg, QueryMsg};
-use marketpalace_capital_call_contract::state::State;
+use marketpalace_subscription_contract::msg::{HandleMsg, InstantiateMsg, QueryMsg};
+use marketpalace_subscription_contract::state::State;
 
 fn main() {
     let mut out_dir = current_dir().unwrap();
