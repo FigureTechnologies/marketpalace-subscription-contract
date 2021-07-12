@@ -71,7 +71,7 @@ pub fn try_submit_pending(
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.status = Status::Pending;
+        state.status = Status::PendingReview;
         Ok(state)
     })?;
 
@@ -91,8 +91,8 @@ pub fn try_accept(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
-    if state.status != Status::Pending {
-        return Err(contract_error("capital promise is not pending proposal"))
+    if state.status != Status::PendingReview {
+        return Err(contract_error("subscription is not pending review"))
     }
 
     if info.sender != state.raise_contract_address {
