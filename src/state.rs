@@ -10,7 +10,7 @@ pub static CONFIG_KEY: &[u8] = b"config";
 pub struct State {
     pub owner: Addr,
     pub status: Status,
-    pub raise_contract_address: Addr,
+    pub raise: Addr,
     pub admin: Addr,
     pub capital_denom: String,
     pub min_commitment: u64,

@@ -1,11 +1,11 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use cosmwasm_std::{Addr};
+use cosmwasm_std::Addr;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub raise_contract_address: Addr,
+    pub raise: Addr,
     pub admin: Addr,
     pub capital_denom: String,
     pub min_commitment: u64,
@@ -19,6 +19,8 @@ pub enum HandleMsg {
     SubmitPendingReview {},
     Accept { commitment: u64 },
     IssueCapitalCall { capital_call: Addr },
+    IssueDistribution {},
+    RedeemDistribution {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

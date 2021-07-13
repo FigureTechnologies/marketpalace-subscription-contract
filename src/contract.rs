@@ -1,13 +1,13 @@
-
 use cosmwasm_std::{
-    entry_point, from_slice, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response, StdResult, StdError
+    coin, entry_point, from_slice, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult,
 };
 use provwasm_std::{mint_marker_supply, withdraw_coins, ProvenanceMsg, ProvenanceQuerier};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, CapitalCall};
+use crate::msg::{CapitalCall, HandleMsg, InstantiateMsg, QueryMsg};
 use crate::state::{config, config_read, State, Status, CONFIG_KEY};
 
 fn contract_error(err: &str) -> ContractError {
@@ -26,7 +26,7 @@ pub fn instantiate(
     let state = State {
         owner: info.sender,
         status: Status::Draft,
-        raise_contract_address: msg.raise_contract_address,
+        raise: msg.raise,
         admin: msg.admin,
         capital_denom: msg.capital_denom,
         min_commitment: msg.min_commitment,
@@ -51,7 +51,11 @@ pub fn execute(
     match msg {
         HandleMsg::SubmitPendingReview {} => try_submit_pending(deps, _env, info),
         HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
-        HandleMsg::IssueCapitalCall { capital_call } => try_issue_capital_call(deps, _env, info, capital_call),
+        HandleMsg::IssueCapitalCall { capital_call } => {
+            try_issue_capital_call(deps, _env, info, capital_call)
+        }
+        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, _env, info),
+        HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, _env, info),
     }
 }
 
@@ -66,7 +70,7 @@ pub fn try_submit_pending(
         return Err(contract_error("contract no longer draft"));
     }
 
-    if info.sender != state.raise_contract_address {
+    if info.sender != state.raise {
         return Err(contract_error("only the raise contract can accept"));
     }
 
@@ -92,10 +96,10 @@ pub fn try_accept(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::PendingReview {
-        return Err(contract_error("subscription is not pending review"))
+        return Err(contract_error("subscription is not pending review"));
     }
 
-    if info.sender != state.raise_contract_address {
+    if info.sender != state.raise {
         return Err(contract_error("only the raise contract can accept"));
     }
 
@@ -136,11 +140,13 @@ pub fn try_issue_capital_call(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("capital promise is not accepted"))
+        return Err(contract_error("capital promise is not accepted"));
     }
 
-    if info.sender != state.raise_contract_address {
-        return Err(contract_error("only the raise contract can issue capital call"));
+    if info.sender != state.raise {
+        return Err(contract_error(
+            "only the raise contract can issue capital call",
+        ));
     }
 
     let contract: CallState = from_slice(
@@ -150,13 +156,22 @@ pub fn try_issue_capital_call(
             .unwrap(),
     )?;
 
-    let balance = deps.querier.query_balance(_env.contract.address, state.capital_denom)?;
-    if contract.amount > state.commitment.map(|commitment| commitment - balance.amount.u128() as u64).unwrap_or(0) {
-        return Err(contract_error("capital call larger than remaining commitment"));
+    let balance = deps
+        .querier
+        .query_balance(_env.contract.address, state.capital_denom)?;
+    if contract.amount
+        > state
+            .commitment
+            .map(|commitment| commitment - balance.amount.u128() as u64)
+            .unwrap_or(0)
+    {
+        return Err(contract_error(
+            "capital call larger than remaining commitment",
+        ));
     }
 
     if contract.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
-        return Err(contract_error("not enough notice"))
+        return Err(contract_error("not enough notice"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -167,6 +182,63 @@ pub fn try_issue_capital_call(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_issue_distribution(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Accepted {
+        return Err(contract_error("capital promise is not accepted"));
+    }
+
+    if info.sender != state.raise {
+        return Err(contract_error(
+            "only the raise contract can issue distribution",
+        ));
+    }
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_redeem_distribution(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Accepted {
+        return Err(contract_error("capital promise is not accepted"));
+    }
+
+    if info.sender != state.owner {
+        return Err(contract_error("only the owner can redeem distribution"));
+    }
+
+    let balance = deps
+        .querier
+        .query_balance(_env.contract.address, state.capital_denom)?;
+    let send = BankMsg::Send {
+        to_address: state.owner.to_string(),
+        amount: vec![balance],
+    }
+    .into();
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![send],
         attributes: vec![],
         data: Option::None,
     })
@@ -189,11 +261,11 @@ mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{from_binary, Addr};
-    use provwasm_mocks::{mock_dependencies};
+    use provwasm_mocks::mock_dependencies;
 
     fn inst_msg() -> InstantiateMsg {
         InstantiateMsg {
-            raise_contract_address: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
+            raise: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
             admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
             capital_denom: String::from("stable_coin"),
             min_commitment: 10_000,
