@@ -23,7 +23,6 @@ pub struct State {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum Status {
     Draft,
-    PendingReview,
     Accepted,
 }
 

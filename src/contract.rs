@@ -49,7 +49,6 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
-        HandleMsg::SubmitPendingReview {} => try_submit_pending(deps, _env, info),
         HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, _env, info, capital_call)
@@ -57,34 +56,6 @@ pub fn execute(
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, _env, info),
         HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, _env, info),
     }
-}
-
-pub fn try_submit_pending(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
-
-    if state.status != Status::Draft {
-        return Err(contract_error("contract no longer draft"));
-    }
-
-    if info.sender != state.raise {
-        return Err(contract_error("only the raise contract can accept"));
-    }
-
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.status = Status::PendingReview;
-        Ok(state)
-    })?;
-
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![],
-        data: Option::None,
-    })
 }
 
 pub fn try_accept(
@@ -95,8 +66,8 @@ pub fn try_accept(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
-    if state.status != Status::PendingReview {
-        return Err(contract_error("subscription is not pending review"));
+    if state.status != Status::Draft {
+        return Err(contract_error("subscription is not in draft status"));
     }
 
     if info.sender != state.raise {
