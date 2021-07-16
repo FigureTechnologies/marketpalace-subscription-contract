@@ -44,23 +44,22 @@ pub fn instantiate(
 #[entry_point]
 pub fn execute(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
-        HandleMsg::Accept { commitment } => try_accept(deps, _env, info, commitment),
+        HandleMsg::Accept { commitment } => try_accept(deps, info, commitment),
         HandleMsg::IssueCapitalCall { capital_call } => {
-            try_issue_capital_call(deps, _env, info, capital_call)
+            try_issue_capital_call(deps, env, info, capital_call)
         }
-        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, _env, info),
-        HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, _env, info),
+        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
+        HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, env, info),
     }
 }
 
 pub fn try_accept(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
     commitment: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -104,7 +103,7 @@ struct CallState {
 
 pub fn try_issue_capital_call(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     capital_call: Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -129,7 +128,7 @@ pub fn try_issue_capital_call(
 
     let balance = deps
         .querier
-        .query_balance(_env.contract.address, state.capital_denom)?;
+        .query_balance(env.contract.address, state.capital_denom)?;
     if contract.amount
         > state
             .commitment
@@ -160,7 +159,6 @@ pub fn try_issue_capital_call(
 
 pub fn try_issue_distribution(
     deps: DepsMut,
-    _env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -185,7 +183,7 @@ pub fn try_issue_distribution(
 
 pub fn try_redeem_distribution(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -200,7 +198,7 @@ pub fn try_redeem_distribution(
 
     let balance = deps
         .querier
-        .query_balance(_env.contract.address, state.capital_denom)?;
+        .query_balance(env.contract.address, state.capital_denom)?;
     let send = BankMsg::Send {
         to_address: state.owner.to_string(),
         amount: vec![balance],
