@@ -2,12 +2,12 @@ use cosmwasm_std::{
     coin, entry_point, from_slice, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult,
 };
-use provwasm_std::{mint_marker_supply, withdraw_coins, ProvenanceMsg, ProvenanceQuerier};
+use provwasm_std::{ProvenanceMsg, ProvenanceQuerier};
 
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use crate::msg::{CapitalCall, HandleMsg, InstantiateMsg, QueryMsg};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, SubTerms};
 use crate::state::{config, config_read, State, Status, CONFIG_KEY};
 
 fn contract_error(err: &str) -> ContractError {
@@ -215,8 +215,16 @@ pub fn try_redeem_distribution(
 
 #[entry_point]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+    let state = config_read(deps.storage).load()?;
+
     match msg {
-        QueryMsg::GetStatus {} => to_binary(&query_status(deps)?),
+        QueryMsg::GetTerms {} => to_binary(&SubTerms {
+            owner: state.owner,
+            raise: state.raise,
+            capital_denom: state.capital_denom,
+            min_commitment: state.min_commitment,
+            max_commitment: state.max_commitment,
+        }),
     }
 }
 
@@ -253,8 +261,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
-        let status: Status = from_binary(&res).unwrap();
-        assert_eq!(Status::Draft, status);
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
+        let terms: SubTerms = from_binary(&res).unwrap();
+        assert_eq!("creator", terms.owner);
     }
 }

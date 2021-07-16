@@ -23,14 +23,17 @@ pub enum HandleMsg {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CapitalCall {
-    pub amount: u64,
-    pub days_of_notice: Option<u16>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    // GetStatus returns the current status as a json-encoded number
-    GetStatus {},
+    // GetTerms returns the terms of this subscription.
+    GetTerms {},
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct SubTerms {
+    pub owner: Addr,
+    pub raise: Addr,
+    pub capital_denom: String,
+    pub min_commitment: u64,
+    pub max_commitment: u64,
 }
