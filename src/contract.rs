@@ -279,24 +279,25 @@ mod tests {
     use provwasm_mocks::{mock_dependencies, must_read_binary_file};
     use provwasm_std::Marker;
 
-    fn inst_msg() -> InstantiateMsg {
-        InstantiateMsg {
-            raise: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
-            admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
-            capital_denom: String::from("stable_coin"),
-            min_commitment: 10_000,
-            max_commitment: 50_000,
-            min_days_of_notice: None,
-        }
-    }
-
     #[test]
     fn initialization() {
         let mut deps = mock_dependencies(&[]);
-        let info = mock_info("creator", &[]);
 
         // we can just call .unwrap() to assert this was a success
-        let res = instantiate(deps.as_mut(), mock_env(), info, inst_msg()).unwrap();
+        let res = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("creator", &[]),
+            InstantiateMsg {
+                raise: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
+                admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 50_000,
+                min_days_of_notice: None,
+            },
+        )
+        .unwrap();
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
