@@ -26,12 +26,12 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    // GetTerms returns the terms of this subscription.
     GetTerms {},
+    GetStatus {},
 }
 
 #[derive(Deserialize, Serialize)]
-pub struct SubTerms {
+pub struct Terms {
     pub owner: Addr,
     pub raise: Addr,
     pub capital_denom: String,

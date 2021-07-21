@@ -7,7 +7,7 @@ use provwasm_std::{transfer_marker_coins, ProvenanceMsg, ProvenanceQuerier};
 use serde::{Deserialize, Serialize};
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, SubTerms};
+use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, Terms};
 use crate::state::{config, config_read, State, Status, CONFIG_KEY};
 
 fn contract_error(err: &str) -> ContractError {
@@ -256,19 +256,15 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let state = config_read(deps.storage).load()?;
 
     match msg {
-        QueryMsg::GetTerms {} => to_binary(&SubTerms {
+        QueryMsg::GetTerms {} => to_binary(&Terms {
             owner: state.owner,
             raise: state.raise,
             capital_denom: state.capital_denom,
             min_commitment: state.min_commitment,
             max_commitment: state.max_commitment,
         }),
+        QueryMsg::GetStatus {} => to_binary(&state.status),
     }
-}
-
-fn query_status(deps: Deps) -> StdResult<Status> {
-    let state = config_read(deps.storage).load()?;
-    Ok(state.status)
 }
 
 #[cfg(test)]
@@ -287,10 +283,10 @@ mod tests {
         let res = instantiate(
             deps.as_mut(),
             mock_env(),
-            mock_info("creator", &[]),
+            mock_info("lp", &[]),
             InstantiateMsg {
-                raise: Addr::unchecked("tp18lysxk7sueunnspju4dar34vlv98a7kyyfkqs7"),
-                admin: Addr::unchecked("tp1apnhcu9x5cz2l8hhgnj0hg7ez53jah7hcan000"),
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 50_000,
@@ -302,8 +298,42 @@ mod tests {
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
-        let terms: SubTerms = from_binary(&res).unwrap();
-        assert_eq!("creator", terms.owner);
+        let terms: Terms = from_binary(&res).unwrap();
+        assert_eq!("lp", terms.owner);
+    }
+
+    #[test]
+    fn accept() {
+        let mut deps = mock_dependencies(&[]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                owner: Addr::unchecked("lp"),
+                status: Status::Draft,
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise", &vec![]),
+            HandleMsg::Accept { commitment: 20_000 },
+        )
+        .unwrap();
+        assert_eq!(0, res.messages.len());
+
+        // it worked, let's query the state
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
+        let status: Status = from_binary(&res).unwrap();
+        assert_eq!(Status::Accepted, status);
     }
 
     #[test]
