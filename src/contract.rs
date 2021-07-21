@@ -56,7 +56,7 @@ pub fn execute(
             try_issue_redemption(deps, env, info, redemption)
         }
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
-        HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, env, info),
+        HandleMsg::Redeem {} => try_redeem(deps, env, info),
     }
 }
 
@@ -210,7 +210,7 @@ pub fn try_issue_distribution(
     })
 }
 
-pub fn try_redeem_distribution(
+pub fn try_redeem(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -437,5 +437,34 @@ mod tests {
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn redeem() {
+        let mut deps = mock_dependencies(&[]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                owner: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::Redeem {},
+        )
+        .unwrap();
+        assert_eq!(1, res.messages.len());
     }
 }

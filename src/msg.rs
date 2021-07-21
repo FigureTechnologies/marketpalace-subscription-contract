@@ -20,7 +20,7 @@ pub enum HandleMsg {
     IssueCapitalCall { capital_call: Addr },
     IssueRedemption { redemption: Coin },
     IssueDistribution {},
-    RedeemDistribution {},
+    Redeem {},
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
