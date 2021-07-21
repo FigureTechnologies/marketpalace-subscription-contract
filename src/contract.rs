@@ -409,4 +409,33 @@ mod tests {
         .unwrap();
         assert_eq!(1, res.messages.len());
     }
+
+    #[test]
+    fn issue_distribution() {
+        let mut deps = mock_dependencies(&[]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                owner: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise", &coins(5_000, "stable_coin")),
+            HandleMsg::IssueDistribution {},
+        )
+        .unwrap();
+        assert_eq!(0, res.messages.len());
+    }
 }
