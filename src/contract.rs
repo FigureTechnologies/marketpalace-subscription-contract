@@ -2,7 +2,7 @@ use cosmwasm_std::{
     coin, entry_point, from_slice, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult,
 };
-use provwasm_std::{ProvenanceMsg, ProvenanceQuerier};
+use provwasm_std::{transfer_marker_coins, ProvenanceMsg, ProvenanceQuerier};
 
 use serde::{Deserialize, Serialize};
 
@@ -53,6 +53,7 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
         }
+        HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, env, info),
     }
@@ -157,9 +158,11 @@ pub fn try_issue_capital_call(
     })
 }
 
-pub fn try_issue_distribution(
+pub fn try_issue_redemption(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
+    redemption: Coin,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -170,6 +173,38 @@ pub fn try_issue_distribution(
     if info.sender != state.raise {
         return Err(contract_error(
             "only the raise contract can issue distribution",
+        ));
+    }
+
+    let marker = ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(redemption.denom)?;
+    let transfer = transfer_marker_coins(
+        redemption.amount.u128(),
+        redemption.denom,
+        marker.address,
+        env.contract.address,
+    )?;
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![transfer],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_issue_distribution(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Accepted {
+        return Err(contract_error("subscription has not been accepted"));
+    }
+
+    if info.sender != state.raise {
+        return Err(contract_error(
+            "only the raise contract can issue redemption",
         ));
     }
 
@@ -189,7 +224,7 @@ pub fn try_redeem_distribution(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("capital promise is not accepted"));
+        return Err(contract_error("subscription has not been accepted"));
     }
 
     if info.sender != state.owner {
