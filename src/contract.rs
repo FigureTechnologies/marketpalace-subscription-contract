@@ -53,7 +53,9 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
         }
-        HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
+        HandleMsg::IssueRedemption { redemption } => {
+            try_issue_redemption(deps, env, info, redemption)
+        }
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::RedeemDistribution {} => try_redeem_distribution(deps, env, info),
     }
@@ -176,7 +178,8 @@ pub fn try_issue_redemption(
         ));
     }
 
-    let marker = ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(redemption.denom)?;
+    let marker =
+        ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(redemption.denom.clone())?;
     let transfer = transfer_marker_coins(
         redemption.amount.u128(),
         redemption.denom,
@@ -272,8 +275,9 @@ fn query_status(deps: Deps) -> StdResult<Status> {
 mod tests {
     use super::*;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{from_binary, Addr};
-    use provwasm_mocks::mock_dependencies;
+    use cosmwasm_std::{coin, coins, from_binary, Addr};
+    use provwasm_mocks::{mock_dependencies, must_read_binary_file};
+    use provwasm_std::Marker;
 
     fn inst_msg() -> InstantiateMsg {
         InstantiateMsg {
@@ -299,5 +303,40 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
         let terms: SubTerms = from_binary(&res).unwrap();
         assert_eq!("creator", terms.owner);
+    }
+
+    #[test]
+    fn issue_redemption() {
+        let mut deps = mock_dependencies(&[]);
+
+        let bin = must_read_binary_file("testdata/marker.json");
+        let expected_marker: Marker = from_binary(&bin).unwrap();
+        deps.querier.with_markers(vec![expected_marker.clone()]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                owner: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise", &coins(5_000, "stable_coin")),
+            HandleMsg::IssueRedemption {
+                redemption: coin(5_000, "capital_receipt"),
+            },
+        )
+        .unwrap();
+        assert_eq!(1, res.messages.len());
     }
 }
