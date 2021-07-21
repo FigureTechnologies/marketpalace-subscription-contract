@@ -1,14 +1,13 @@
 use cosmwasm_std::{
-    coin, entry_point, from_slice, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult,
+    entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
+    StdError, StdResult,
 };
 use provwasm_std::{transfer_marker_coins, ProvenanceMsg, ProvenanceQuerier};
 
-use serde::{Deserialize, Serialize};
-
+use crate::call::{CallQueryMsg, CallTerms};
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, Terms};
-use crate::state::{config, config_read, State, Status, CONFIG_KEY};
+use crate::state::{config, config_read, State, Status};
 
 fn contract_error(err: &str) -> ContractError {
     ContractError::Std(StdError::generic_err(err))
@@ -98,12 +97,6 @@ pub fn try_accept(
     })
 }
 
-#[derive(Deserialize)]
-struct CallState {
-    amount: u64,
-    days_of_notice: Option<u16>,
-}
-
 pub fn try_issue_capital_call(
     deps: DepsMut,
     env: Env,
@@ -122,17 +115,15 @@ pub fn try_issue_capital_call(
         ));
     }
 
-    let contract: CallState = from_slice(
-        &deps
-            .querier
-            .query_wasm_raw(capital_call.clone(), CONFIG_KEY)?
-            .unwrap(),
-    )?;
+    let terms: CallTerms = deps
+        .querier
+        .query_wasm_smart(capital_call.clone(), &CallQueryMsg::GetTerms {})
+        .expect("terms");
 
     let balance = deps
         .querier
         .query_balance(env.contract.address, state.capital_denom)?;
-    if contract.amount
+    if terms.amount
         > state
             .commitment
             .map(|commitment| commitment - balance.amount.u128() as u64)
@@ -143,7 +134,7 @@ pub fn try_issue_capital_call(
         ));
     }
 
-    if contract.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
+    if terms.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
         return Err(contract_error("not enough notice"));
     }
 
@@ -270,8 +261,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::{coin, coins, from_binary, Addr};
+    use crate::mock::wasm_smart_mock_dependencies;
+    use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
+    use cosmwasm_std::{coin, coins, from_binary, Addr, ContractResult, SystemError, SystemResult};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file};
     use provwasm_std::Marker;
 
@@ -334,6 +326,53 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
         let status: Status = from_binary(&res).unwrap();
         assert_eq!(Status::Accepted, status);
+    }
+
+    #[test]
+    fn issue_capital_call() {
+        let mut deps = wasm_smart_mock_dependencies(
+            &coins(10_000, "capital_receipt"),
+            |contract_addr, _msg| match &contract_addr[..] {
+                "call_1" => SystemResult::Ok(ContractResult::Ok(
+                    to_binary(&CallTerms {
+                        subscription: Addr::unchecked("sub_1"),
+                        raise: Addr::unchecked(MOCK_CONTRACT_ADDR),
+                        amount: 10_000,
+                        days_of_notice: None,
+                    })
+                    .unwrap(),
+                )),
+                _ => SystemResult::Err(SystemError::UnsupportedRequest {
+                    kind: String::from("not mocked"),
+                }),
+            },
+        );
+
+        config(&mut deps.storage)
+            .save(&State {
+                owner: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: Some(20_000),
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise", &vec![]),
+            HandleMsg::IssueCapitalCall {
+                capital_call: Addr::unchecked("call_1"),
+            },
+        )
+        .unwrap();
+        assert_eq!(0, res.messages.len());
     }
 
     #[test]
