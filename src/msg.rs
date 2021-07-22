@@ -16,6 +16,7 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
+    Recover { lp: Addr },
     Accept { commitment: u64 },
     IssueCapitalCall { capital_call: Addr },
     IssueRedemption { redemption: Coin },
@@ -32,7 +33,7 @@ pub enum QueryMsg {
 
 #[derive(Deserialize, Serialize)]
 pub struct Terms {
-    pub owner: Addr,
+    pub lp: Addr,
     pub raise: Addr,
     pub capital_denom: String,
     pub min_commitment: u64,

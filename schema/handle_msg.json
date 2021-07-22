@@ -5,6 +5,26 @@
     {
       "type": "object",
       "required": [
+        "recover"
+      ],
+      "properties": {
+        "recover": {
+          "type": "object",
+          "required": [
+            "lp"
+          ],
+          "properties": {
+            "lp": {
+              "$ref": "#/definitions/Addr"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "accept"
       ],
       "properties": {

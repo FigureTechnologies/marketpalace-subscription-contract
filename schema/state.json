@@ -6,9 +6,9 @@
     "admin",
     "capital_calls",
     "capital_denom",
+    "lp",
     "max_commitment",
     "min_commitment",
-    "owner",
     "raise",
     "status"
   ],
@@ -33,6 +33,9 @@
       "format": "uint64",
       "minimum": 0.0
     },
+    "lp": {
+      "$ref": "#/definitions/Addr"
+    },
     "max_commitment": {
       "type": "integer",
       "format": "uint64",
@@ -50,9 +53,6 @@
       ],
       "format": "uint16",
       "minimum": 0.0
-    },
-    "owner": {
-      "$ref": "#/definitions/Addr"
     },
     "raise": {
       "$ref": "#/definitions/Addr"

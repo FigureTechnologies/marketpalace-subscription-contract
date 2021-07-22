@@ -23,7 +23,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     let state = State {
-        owner: info.sender,
+        lp: info.sender,
         status: Status::Draft,
         raise: msg.raise,
         admin: msg.admin,
@@ -48,6 +48,7 @@ pub fn execute(
     msg: HandleMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
+        HandleMsg::Recover { lp } => try_recover(deps, info, lp),
         HandleMsg::Accept { commitment } => try_accept(deps, info, commitment),
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
@@ -58,6 +59,30 @@ pub fn execute(
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::Redeem {} => try_redeem(deps, env, info),
     }
+}
+
+pub fn try_recover(
+    deps: DepsMut,
+    info: MessageInfo,
+    lp: Addr,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if info.sender != state.admin {
+        return Err(contract_error("only admin can recover subscription"));
+    }
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.lp = lp;
+        Ok(state)
+    })?;
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
 }
 
 pub fn try_accept(
@@ -221,15 +246,15 @@ pub fn try_redeem(
         return Err(contract_error("subscription has not been accepted"));
     }
 
-    if info.sender != state.owner {
-        return Err(contract_error("only the owner can redeem distribution"));
+    if info.sender != state.lp {
+        return Err(contract_error("only the lp can redeem distribution"));
     }
 
     let balance = deps
         .querier
         .query_balance(env.contract.address, state.capital_denom)?;
     let send = BankMsg::Send {
-        to_address: state.owner.to_string(),
+        to_address: state.lp.to_string(),
         amount: vec![balance],
     }
     .into();
@@ -248,7 +273,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
     match msg {
         QueryMsg::GetTerms {} => to_binary(&Terms {
-            owner: state.owner,
+            lp: state.lp,
             raise: state.raise,
             capital_denom: state.capital_denom,
             min_commitment: state.min_commitment,
@@ -291,7 +316,67 @@ mod tests {
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
         let terms: Terms = from_binary(&res).unwrap();
-        assert_eq!("lp", terms.owner);
+        assert_eq!("lp", terms.lp);
+    }
+
+    #[test]
+    fn recover() {
+        let mut deps = mock_dependencies(&[]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                status: Status::Draft,
+                raise: Addr::unchecked("raise"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &vec![]),
+            HandleMsg::Recover {
+                lp: Addr::unchecked("lp_2"),
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn bad_actor_recover_fail() {
+        let mut deps = mock_dependencies(&[]);
+
+        config(&mut deps.storage)
+            .save(&State {
+                admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                status: Status::Draft,
+                raise: Addr::unchecked("raise"),
+                capital_denom: String::from("stable_coin"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                commitment: None,
+                capital_calls: vec![],
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::Recover {
+                lp: Addr::unchecked("bad_actor"),
+            },
+        );
+        assert_eq!(true, res.is_err());
     }
 
     #[test]
@@ -300,7 +385,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                owner: Addr::unchecked("lp"),
+                lp: Addr::unchecked("lp"),
                 status: Status::Draft,
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
@@ -350,7 +435,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                owner: Addr::unchecked("lp"),
+                lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
@@ -385,7 +470,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                owner: Addr::unchecked("lp"),
+                lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
@@ -416,7 +501,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                owner: Addr::unchecked("lp"),
+                lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
@@ -445,7 +530,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                owner: Addr::unchecked("lp"),
+                lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
