@@ -2,7 +2,10 @@ use cosmwasm_std::{
     entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult,
 };
-use provwasm_std::{transfer_marker_coins, ProvenanceMsg, ProvenanceQuerier};
+use provwasm_std::{
+    activate_marker, create_marker, grant_marker_access, transfer_marker_coins, MarkerAccess,
+    MarkerType, ProvenanceMsg, ProvenanceQuerier,
+};
 
 use crate::call::{CallQueryMsg, CallTerms};
 use crate::error::ContractError;
@@ -18,14 +21,14 @@ fn contract_error(err: &str) -> ContractError {
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
-) -> Result<Response, ContractError> {
+) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = State {
         lp: info.sender,
         status: Status::Draft,
-        raise: msg.raise,
+        raise: msg.raise.clone(),
         admin: msg.admin,
         capital_denom: msg.capital_denom,
         min_commitment: msg.min_commitment,
@@ -36,7 +39,27 @@ pub fn instantiate(
     };
     config(deps.storage).save(&state)?;
 
-    Ok(Response::default())
+    let commitment_denom = format!("commitment_{}_{}", env.contract.address, msg.raise);
+
+    let create = create_marker(msg.min_commitment as u128, commitment_denom.clone(), MarkerType::Coin)?;
+    let grant = grant_marker_access(
+        commitment_denom.clone(),
+        env.contract.address,
+        vec![
+            MarkerAccess::Admin,
+            MarkerAccess::Mint,
+            MarkerAccess::Burn,
+            MarkerAccess::Withdraw,
+        ],
+    )?;
+    let activate = activate_marker(commitment_denom)?;
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![create, grant, activate],
+        attributes: vec![],
+        data: Option::None,
+    })
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -311,7 +334,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(0, res.messages.len());
+        assert_eq!(3, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
