@@ -17,7 +17,7 @@ pub struct InstantiateMsg {
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
     Recover { lp: Addr },
-    Accept { commitment: u64 },
+    Accept {},
     IssueCapitalCall { capital_call: Addr },
     IssueRedemption { redemption: Coin },
     IssueDistribution {},

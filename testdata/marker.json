@@ -2,8 +2,8 @@
   "address": "tp18vmzryrvwaeykmdtu6cfrz5sau3dhc5c73ms0u",
   "coins": [
     {
-      "denom": "capital_receipt",
-      "amount": "420"
+      "denom": "commitment_sub_1_raise_1",
+      "amount": "20000"
     }
   ],
   "public_key": "",
@@ -23,8 +23,8 @@
     }
   ],
   "status": "active",
-  "denom": "capital_receipt",
-  "total_supply": "420",
+  "denom": "investment_raise_1",
+  "total_supply": "0",
   "marker_type": "coin",
   "supply_fixed": false
 }

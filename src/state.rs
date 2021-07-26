@@ -17,7 +17,6 @@ pub struct State {
     pub min_commitment: u64,
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,
-    pub commitment: Option<u64>,
     pub capital_calls: Vec<Addr>,
 }
 
