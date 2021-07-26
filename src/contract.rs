@@ -3,8 +3,8 @@ use cosmwasm_std::{
     StdError, StdResult,
 };
 use provwasm_std::{
-    activate_marker, create_marker, grant_marker_access, transfer_marker_coins, MarkerAccess,
-    MarkerType, ProvenanceMsg, ProvenanceQuerier,
+    activate_marker, create_marker, grant_marker_access, transfer_marker_coins, withdraw_coins,
+    MarkerAccess, MarkerType, ProvenanceMsg, ProvenanceQuerier,
 };
 
 use crate::call::{CallQueryMsg, CallTerms};
@@ -142,9 +142,16 @@ pub fn try_accept(
         Ok(state)
     })?;
 
+    let withraw = withdraw_coins(
+        state.commitment_denom.clone(),
+        investment.amount.u128(),
+        state.commitment_denom,
+        state.raise,
+    )?;
+
     Ok(Response {
         submessages: vec![],
-        messages: vec![],
+        messages: vec![withraw],
         attributes: vec![],
         data: Option::None,
     })
@@ -172,12 +179,17 @@ pub fn try_issue_capital_call(
         .query_wasm_smart(capital_call.clone(), &CallQueryMsg::GetTerms {})
         .expect("terms");
 
-    let raise_marker = ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(format!("investment_{}", state.raise))?;
-    let commitment = match raise_marker.coins.iter().find(|coin| coin.denom == state.commitment_denom) {
+    let raise_marker = ProvenanceQuerier::new(&deps.querier)
+        .get_marker_by_denom(format!("investment_{}", state.raise))?;
+    let commitment = match raise_marker
+        .coins
+        .iter()
+        .find(|coin| coin.denom == state.commitment_denom)
+    {
         Some(commitment) => commitment,
         None => return Err(contract_error("no commitement held in raise")),
     };
-    
+
     if terms.amount > commitment.amount.u128() as u64 {
         return Err(contract_error(
             "capital call larger than remaining commitment",
@@ -436,7 +448,7 @@ mod tests {
             HandleMsg::Accept {},
         )
         .unwrap();
-        assert_eq!(0, res.messages.len());
+        assert_eq!(1, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
