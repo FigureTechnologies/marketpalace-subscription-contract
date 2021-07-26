@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    coins, entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
-    StdError, StdResult,
+    coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult,
 };
 use provwasm_std::{
     activate_marker, create_marker, grant_marker_access, withdraw_coins, MarkerAccess, MarkerType,
@@ -328,7 +328,7 @@ mod tests {
     use super::*;
     use crate::mock::wasm_smart_mock_dependencies;
     use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coin, coins, from_binary, Addr, ContractResult, SystemError, SystemResult};
+    use cosmwasm_std::{coins, from_binary, Addr, ContractResult, SystemError, SystemResult};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
     use provwasm_std::Marker;
 
@@ -533,9 +533,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("raise_1", &coins(5_000, "stable_coin")),
-            HandleMsg::IssueRedemption {
-                redemption: 5_000,
-            },
+            HandleMsg::IssueRedemption { redemption: 5_000 },
         )
         .unwrap();
         assert_eq!(1, res.messages.len());

@@ -6,6 +6,7 @@
     "admin",
     "capital_calls",
     "capital_denom",
+    "commitment_denom",
     "lp",
     "max_commitment",
     "min_commitment",
@@ -25,13 +26,8 @@
     "capital_denom": {
       "type": "string"
     },
-    "commitment": {
-      "type": [
-        "integer",
-        "null"
-      ],
-      "format": "uint64",
-      "minimum": 0.0
+    "commitment_denom": {
+      "type": "string"
     },
     "lp": {
       "$ref": "#/definitions/Addr"
