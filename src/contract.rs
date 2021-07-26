@@ -1,10 +1,10 @@
 use cosmwasm_std::{
-    entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
+    coins, entry_point, to_binary, Addr, BankMsg, Binary, Coin, Deps, DepsMut, Env, MessageInfo, Response,
     StdError, StdResult,
 };
 use provwasm_std::{
-    activate_marker, create_marker, grant_marker_access, transfer_marker_coins, withdraw_coins,
-    MarkerAccess, MarkerType, ProvenanceMsg, ProvenanceQuerier,
+    activate_marker, create_marker, grant_marker_access, withdraw_coins, MarkerAccess, MarkerType,
+    ProvenanceMsg, ProvenanceQuerier,
 };
 
 use crate::call::{CallQueryMsg, CallTerms};
@@ -78,9 +78,7 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, info, capital_call)
         }
-        HandleMsg::IssueRedemption { redemption } => {
-            try_issue_redemption(deps, env, info, redemption)
-        }
+        HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::Redeem {} => try_redeem(deps, env, info),
     }
@@ -215,34 +213,39 @@ pub fn try_issue_capital_call(
 
 pub fn try_issue_redemption(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
-    redemption: Coin,
+    redemption: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("capital promise is not accepted"));
+        return Err(contract_error("subscription is not accepted"));
     }
 
     if info.sender != state.raise {
         return Err(contract_error(
-            "only the raise contract can issue distribution",
+            "only the raise contract can issue redemption",
         ));
     }
 
-    let marker =
-        ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(redemption.denom.clone())?;
-    let transfer = transfer_marker_coins(
-        redemption.amount.u128(),
-        redemption.denom,
-        marker.address,
-        env.contract.address,
-    )?;
+    let payment = match info.funds.first() {
+        Some(payment) => payment,
+        None => return Err(contract_error("payment required for redemption")),
+    };
+
+    if payment.denom != state.capital_denom {
+        return Err(contract_error("payment should be made in capital denom"));
+    }
+
+    let send = BankMsg::Send {
+        to_address: state.raise.to_string(),
+        amount: coins(redemption as u128, format!("investment_{}", state.raise)),
+    }
+    .into();
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![transfer],
+        messages: vec![send],
         attributes: vec![],
         data: Option::None,
     })
@@ -531,7 +534,7 @@ mod tests {
             mock_env(),
             mock_info("raise_1", &coins(5_000, "stable_coin")),
             HandleMsg::IssueRedemption {
-                redemption: coin(5_000, "investment_raise_1"),
+                redemption: 5_000,
             },
         )
         .unwrap();

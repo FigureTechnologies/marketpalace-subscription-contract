@@ -19,7 +19,7 @@ pub enum HandleMsg {
     Recover { lp: Addr },
     Accept {},
     IssueCapitalCall { capital_call: Addr },
-    IssueRedemption { redemption: Coin },
+    IssueRedemption { redemption: u64 },
     IssueDistribution {},
     Redeem {},
 }
