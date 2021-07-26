@@ -13,6 +13,7 @@ pub struct State {
     pub status: Status,
     pub raise: Addr,
     pub capital_denom: String,
+    pub commitment_denom: String,
     pub min_commitment: u64,
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,

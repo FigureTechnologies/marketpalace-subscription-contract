@@ -31,6 +31,7 @@ pub fn instantiate(
         raise: msg.raise.clone(),
         admin: msg.admin,
         capital_denom: msg.capital_denom,
+        commitment_denom: format!("commitment_{}_{}", env.contract.address, msg.raise),
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
@@ -39,11 +40,9 @@ pub fn instantiate(
     };
     config(deps.storage).save(&state)?;
 
-    let commitment_denom = format!("commitment_{}_{}", env.contract.address, msg.raise);
-
-    let create = create_marker(msg.min_commitment as u128, commitment_denom.clone(), MarkerType::Coin)?;
+    let create = create_marker(msg.min_commitment as u128, state.commitment_denom.clone(), MarkerType::Coin)?;
     let grant = grant_marker_access(
-        commitment_denom.clone(),
+        state.commitment_denom.clone(),
         env.contract.address,
         vec![
             MarkerAccess::Admin,
@@ -52,7 +51,7 @@ pub fn instantiate(
             MarkerAccess::Withdraw,
         ],
     )?;
-    let activate = activate_marker(commitment_denom)?;
+    let activate = activate_marker(state.commitment_denom)?;
 
     Ok(Response {
         submessages: vec![],
@@ -353,6 +352,7 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -383,6 +383,7 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -413,6 +414,7 @@ mod tests {
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -463,6 +465,7 @@ mod tests {
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -498,6 +501,7 @@ mod tests {
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -529,6 +533,7 @@ mod tests {
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -558,6 +563,7 @@ mod tests {
                 raise: Addr::unchecked("raise"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
