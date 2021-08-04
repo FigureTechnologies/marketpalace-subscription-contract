@@ -3,8 +3,8 @@ use cosmwasm_std::{
     Response, StdError, StdResult,
 };
 use provwasm_std::{
-    activate_marker, create_marker, grant_marker_access, withdraw_coins, MarkerAccess, MarkerType,
-    ProvenanceMsg, ProvenanceQuerier,
+    activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
+    MarkerAccess, MarkerType, ProvenanceMsg, ProvenanceQuerier,
 };
 
 use crate::call::{CallQueryMsg, CallTerms};
@@ -31,7 +31,7 @@ pub fn instantiate(
         raise: msg.raise.clone(),
         admin: msg.admin,
         capital_denom: msg.capital_denom,
-        commitment_denom: format!("commitment_{}_{}", env.contract.address, msg.raise),
+        commitment_denom: format!("{}.commitment", env.contract.address),
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
@@ -54,11 +54,12 @@ pub fn instantiate(
             MarkerAccess::Withdraw,
         ],
     )?;
+    let finalize = finalize_marker(state.commitment_denom.clone())?;
     let activate = activate_marker(state.commitment_denom)?;
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![create, grant, activate],
+        messages: vec![create, grant, finalize, activate],
         attributes: vec![],
         data: Option::None,
     })
@@ -357,7 +358,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(3, res.messages.len());
+        assert_eq!(4, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
