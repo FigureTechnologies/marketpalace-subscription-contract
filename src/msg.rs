@@ -5,7 +5,7 @@ use cosmwasm_std::Addr;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub raise: Addr,
+    pub lp: Addr,
     pub admin: Addr,
     pub capital_denom: String,
     pub min_commitment: u64,

@@ -26,9 +26,9 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = State {
-        lp: info.sender,
+        raise: info.sender,
         status: Status::Draft,
-        raise: msg.raise.clone(),
+        lp: msg.lp.clone(),
         admin: msg.admin,
         capital_denom: msg.capital_denom,
         commitment_denom: format!("{}.commitment", env.contract.address),
@@ -387,7 +387,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &[]),
             InstantiateMsg {
-                raise: Addr::unchecked("raise_1"),
+                lp: Addr::unchecked("lp"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
