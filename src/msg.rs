@@ -18,10 +18,17 @@ pub struct InstantiateMsg {
 pub enum HandleMsg {
     Recover { lp: Addr },
     Accept {},
-    IssueCapitalCall { capital_call: Addr },
+    IssueCapitalCall { capital_call: CapitalCall },
+    CloseCapitalCall {},
     IssueRedemption { redemption: u64 },
     IssueDistribution {},
     Redeem {},
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
+pub struct CapitalCall {
+    pub amount: u64,
+    pub days_of_notice: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

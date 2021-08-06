@@ -1,13 +1,13 @@
+use crate::msg::CapitalCall;
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
     Response, StdError, StdResult,
 };
 use provwasm_std::{
     activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
-    MarkerAccess, MarkerType, ProvenanceMsg, ProvenanceQuerier,
+    MarkerAccess, MarkerType, ProvenanceMsg,
 };
 
-use crate::call::{CallQueryMsg, CallTerms};
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, Terms};
 use crate::state::{config, config_read, State, Status};
@@ -35,7 +35,7 @@ pub fn instantiate(
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
-        capital_calls: vec![],
+        capital_call: None,
     };
     config(deps.storage).save(&state)?;
 
@@ -79,6 +79,7 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, info, capital_call)
         }
+        HandleMsg::CloseCapitalCall {} => try_close_capital_call(deps, info),
         HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::Redeem {} => try_redeem(deps, env, info),
@@ -159,12 +160,12 @@ pub fn try_accept(
 pub fn try_issue_capital_call(
     deps: DepsMut,
     info: MessageInfo,
-    capital_call: Addr,
+    capital_call: CapitalCall,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("capital promise is not accepted"));
+        return Err(contract_error("subscription is not accepted"));
     }
 
     if info.sender != state.raise {
@@ -173,40 +174,78 @@ pub fn try_issue_capital_call(
         ));
     }
 
-    let terms: CallTerms = deps
+    let commitment = deps
         .querier
-        .query_wasm_smart(capital_call.clone(), &CallQueryMsg::GetTerms {})
-        .expect("terms");
+        .query_balance(state.raise, state.commitment_denom)
+        .unwrap();
 
-    let raise_marker = ProvenanceQuerier::new(&deps.querier)
-        .get_marker_by_denom(format!("investment_{}", state.raise))?;
-    let commitment = match raise_marker
-        .coins
-        .iter()
-        .find(|coin| coin.denom == state.commitment_denom)
-    {
-        Some(commitment) => commitment,
-        None => return Err(contract_error("no commitement held in raise")),
-    };
-
-    if terms.amount > commitment.amount.u128() as u64 {
+    if capital_call.amount > commitment.amount.u128() as u64 {
         return Err(contract_error(
             "capital call larger than remaining commitment",
         ));
     }
 
-    if terms.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
+    if capital_call.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
         return Err(contract_error("not enough notice"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.capital_calls.push(capital_call);
+        state.capital_call = Some(capital_call);
         Ok(state)
     })?;
 
     Ok(Response {
         submessages: vec![],
         messages: vec![],
+        attributes: vec![],
+        data: Option::None,
+    })
+}
+
+pub fn try_close_capital_call(
+    deps: DepsMut,
+    info: MessageInfo,
+) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let state = config_read(deps.storage).load()?;
+
+    if state.status != Status::Accepted {
+        return Err(contract_error("subscription is not accepted"));
+    }
+
+    if info.sender != state.raise {
+        return Err(contract_error(
+            "only the raise contract can close capital call",
+        ));
+    }
+
+    let capital_call = match state.capital_call {
+        Some(capital_call) => capital_call,
+        None => return Err(contract_error("no existing capital call issued")),
+    };
+
+    let commitment = match info.funds.first() {
+        Some(commitment) => commitment,
+        None => return Err(contract_error("no commitment provided")),
+    };
+
+    if commitment.amount.u128() != u128::from(capital_call.amount) {
+        return Err(contract_error("incorrect commitment provided"));
+    }
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.capital_call = None;
+        Ok(state)
+    })?;
+
+    let send = BankMsg::Send {
+        to_address: state.raise.to_string(),
+        amount: coins(capital_call.amount as u128, state.capital_denom),
+    }
+    .into();
+
+    Ok(Response {
+        submessages: vec![],
+        messages: vec![send],
         attributes: vec![],
         data: Option::None,
     })
@@ -327,9 +366,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::mock::wasm_smart_mock_dependencies;
-    use cosmwasm_std::testing::{mock_env, mock_info, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::{coins, from_binary, Addr, ContractResult, SystemError, SystemResult};
+    use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::{coins, from_binary, Addr};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
     use provwasm_std::Marker;
 
@@ -381,7 +419,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -411,7 +449,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -441,7 +479,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -462,25 +500,11 @@ mod tests {
 
     #[test]
     fn issue_capital_call() {
-        let mut deps = wasm_smart_mock_dependencies(
-            &coins(10_000, "capital_receipt"),
-            |contract_addr, _msg| match &contract_addr[..] {
-                "call_1" => SystemResult::Ok(ContractResult::Ok(
-                    to_binary(&CallTerms {
-                        subscription: Addr::unchecked("sub_1"),
-                        raise: Addr::unchecked(MOCK_CONTRACT_ADDR),
-                        amount: 10_000,
-                        days_of_notice: None,
-                    })
-                    .unwrap(),
-                )),
-                _ => SystemResult::Err(SystemError::UnsupportedRequest {
-                    kind: String::from("not mocked"),
-                }),
-            },
-        );
+        let mut deps = mock_dependencies(&vec![]);
 
-        load_markers(&mut deps.querier.base);
+        deps.querier
+            .base
+            .update_balance(Addr::unchecked("raise_1"), coins(10_000, "commitment"));
 
         config(&mut deps.storage)
             .save(&State {
@@ -489,11 +513,11 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_1_raise_1"),
+                commitment_denom: String::from("commitment"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -502,11 +526,46 @@ mod tests {
             mock_env(),
             mock_info("raise_1", &vec![]),
             HandleMsg::IssueCapitalCall {
-                capital_call: Addr::unchecked("call_1"),
+                capital_call: CapitalCall {
+                    amount: 10_000,
+                    days_of_notice: None,
+                },
             },
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn close_capital_call() {
+        let mut deps = mock_dependencies(&coins(10_000, "stable_coin"));
+
+        config(&mut deps.storage)
+            .save(&State {
+                lp: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise_1"),
+                admin: Addr::unchecked("admin"),
+                capital_denom: String::from("stable_coin"),
+                commitment_denom: String::from("commitment"),
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                capital_call: Some(CapitalCall {
+                    amount: 10_000,
+                    days_of_notice: None,
+                }),
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise_1", &coins(10_000, "commitment")),
+            HandleMsg::CloseCapitalCall {},
+        )
+        .unwrap();
+        assert_eq!(1, res.messages.len());
     }
 
     #[test]
@@ -526,7 +585,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -555,7 +614,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 
@@ -584,7 +643,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_calls: vec![],
+                capital_call: None,
             })
             .unwrap();
 

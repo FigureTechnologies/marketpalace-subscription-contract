@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
+use crate::msg::CapitalCall;
+
 pub static CONFIG_KEY: &[u8] = b"config";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -17,7 +19,7 @@ pub struct State {
     pub min_commitment: u64,
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,
-    pub capital_calls: Vec<Addr>,
+    pub capital_call: Option<CapitalCall>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
