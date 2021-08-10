@@ -5,9 +5,9 @@
   "required": [
     "admin",
     "capital_denom",
+    "lp",
     "max_commitment",
-    "min_commitment",
-    "raise"
+    "min_commitment"
   ],
   "properties": {
     "admin": {
@@ -15,6 +15,9 @@
     },
     "capital_denom": {
       "type": "string"
+    },
+    "lp": {
+      "$ref": "#/definitions/Addr"
     },
     "max_commitment": {
       "type": "integer",
@@ -33,9 +36,6 @@
       ],
       "format": "uint16",
       "minimum": 0.0
-    },
-    "raise": {
-      "$ref": "#/definitions/Addr"
     }
   },
   "definitions": {
