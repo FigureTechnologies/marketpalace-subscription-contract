@@ -39,27 +39,9 @@ pub fn instantiate(
     };
     config(deps.storage).save(&state)?;
 
-    let create = create_marker(
-        msg.min_commitment as u128,
-        state.commitment_denom.clone(),
-        MarkerType::Coin,
-    )?;
-    let grant = grant_marker_access(
-        state.commitment_denom.clone(),
-        env.contract.address,
-        vec![
-            MarkerAccess::Admin,
-            MarkerAccess::Mint,
-            MarkerAccess::Burn,
-            MarkerAccess::Withdraw,
-        ],
-    )?;
-    let finalize = finalize_marker(state.commitment_denom.clone())?;
-    let activate = activate_marker(state.commitment_denom)?;
-
     Ok(Response {
         submessages: vec![],
-        messages: vec![create, grant, finalize, activate],
+        messages: vec![],
         attributes: vec![],
         data: Option::None,
     })
@@ -75,7 +57,7 @@ pub fn execute(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
-        HandleMsg::Accept {} => try_accept(deps, info),
+        HandleMsg::Accept {} => try_accept(deps, env, info),
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, info, capital_call)
         }
@@ -112,6 +94,7 @@ pub fn try_recover(
 
 pub fn try_accept(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -142,6 +125,24 @@ pub fn try_accept(
         Ok(state)
     })?;
 
+    let create = create_marker(
+        investment.amount.u128(),
+        state.commitment_denom.clone(),
+        MarkerType::Coin,
+    )?;
+    let grant = grant_marker_access(
+        state.commitment_denom.clone(),
+        env.contract.address,
+        vec![
+            MarkerAccess::Admin,
+            MarkerAccess::Mint,
+            MarkerAccess::Burn,
+            MarkerAccess::Withdraw,
+        ],
+    )?;
+    let finalize = finalize_marker(state.commitment_denom.clone())?;
+    let activate = activate_marker(state.commitment_denom.clone())?;
+
     let withraw = withdraw_coins(
         state.commitment_denom.clone(),
         investment.amount.u128(),
@@ -151,7 +152,7 @@ pub fn try_accept(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![withraw],
+        messages: vec![create, grant, finalize, activate, withraw],
         attributes: vec![],
         data: Option::None,
     })
@@ -396,7 +397,7 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(4, res.messages.len());
+        assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
@@ -490,7 +491,7 @@ mod tests {
             HandleMsg::Accept {},
         )
         .unwrap();
-        assert_eq!(1, res.messages.len());
+        assert_eq!(5, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
