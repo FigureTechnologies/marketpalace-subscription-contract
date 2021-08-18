@@ -1,7 +1,7 @@
-use crate::msg::CapitalCall;
+use std::collections::HashSet;
 use cosmwasm_std::{
-    coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult,
+    coins, entry_point, to_binary, Addr, Attribute, BankMsg, Binary, Deps, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult,
 };
 use provwasm_std::{
     activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
@@ -9,8 +9,8 @@ use provwasm_std::{
 };
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, InstantiateMsg, QueryMsg, Terms};
-use crate::state::{config, config_read, State, Status};
+use crate::msg::{CapitalCallIssuance, HandleMsg, InstantiateMsg, QueryMsg, Terms};
+use crate::state::{config, config_read, CapitalCall, State, Status};
 
 fn contract_error(err: &str) -> ContractError {
     ContractError::Std(StdError::generic_err(err))
@@ -35,7 +35,10 @@ pub fn instantiate(
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
-        capital_call: None,
+        capital_call_id_sequence: 0,
+        active_capital_call: None,
+        closed_capital_calls: HashSet::new(),
+        cancelled_capital_calls: HashSet::new(),
     };
     config(deps.storage).save(&state)?;
 
@@ -161,7 +164,7 @@ pub fn try_accept(
 pub fn try_issue_capital_call(
     deps: DepsMut,
     info: MessageInfo,
-    capital_call: CapitalCall,
+    capital_call: CapitalCallIssuance,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -191,14 +194,25 @@ pub fn try_issue_capital_call(
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.capital_call = Some(capital_call);
+        state.capital_call_id_sequence += 1;
+        let replaced = state.active_capital_call.replace(CapitalCall {
+            id: state.capital_call_id_sequence,
+            amount: capital_call.amount,
+            days_of_notice: capital_call.days_of_notice,
+        });
+        if let Some(replaced) = replaced {
+            state.cancelled_capital_calls.insert(replaced);
+        }
         Ok(state)
     })?;
 
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![Attribute {
+            key: String::from("capital_call_id"),
+            value: format!("{}", state.capital_call_id_sequence),
+        }],
         data: Option::None,
     })
 }
@@ -219,7 +233,7 @@ pub fn try_close_capital_call(
         ));
     }
 
-    let capital_call = match state.capital_call {
+    let capital_call = match state.active_capital_call {
         Some(capital_call) => capital_call,
         None => return Err(contract_error("no existing capital call issued")),
     };
@@ -234,7 +248,9 @@ pub fn try_close_capital_call(
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.capital_call = None;
+        state
+            .closed_capital_calls
+            .insert(state.active_capital_call.take().unwrap());
         Ok(state)
     })?;
 
@@ -420,7 +436,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -450,7 +469,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -480,7 +502,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -518,7 +543,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -527,7 +555,7 @@ mod tests {
             mock_env(),
             mock_info("raise_1", &vec![]),
             HandleMsg::IssueCapitalCall {
-                capital_call: CapitalCall {
+                capital_call: CapitalCallIssuance {
                     amount: 10_000,
                     days_of_notice: None,
                 },
@@ -552,10 +580,14 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: Some(CapitalCall {
+                capital_call_id_sequence: 0,
+                active_capital_call: Some(CapitalCall {
+                    id: 1,
                     amount: 10_000,
                     days_of_notice: None,
                 }),
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -586,7 +618,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -615,7 +650,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
@@ -644,7 +682,10 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call: None,
+                capital_call_id_sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
             })
             .unwrap();
 
