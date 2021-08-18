@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, Attribute, BankMsg, Binary, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult,
@@ -7,6 +6,7 @@ use provwasm_std::{
     activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
     MarkerAccess, MarkerType, ProvenanceMsg,
 };
+use std::collections::HashSet;
 
 use crate::error::ContractError;
 use crate::msg::{CapitalCallIssuance, HandleMsg, InstantiateMsg, QueryMsg, Terms};
@@ -62,7 +62,7 @@ pub fn execute(
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
         HandleMsg::Accept {} => try_accept(deps, env, info),
         HandleMsg::IssueCapitalCall { capital_call } => {
-            try_issue_capital_call(deps, info, capital_call)
+            try_issue_capital_call(deps, env, info, capital_call)
         }
         HandleMsg::CloseCapitalCall {} => try_close_capital_call(deps, info),
         HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
@@ -163,6 +163,7 @@ pub fn try_accept(
 
 pub fn try_issue_capital_call(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
     capital_call: CapitalCallIssuance,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -210,7 +211,7 @@ pub fn try_issue_capital_call(
         submessages: vec![],
         messages: vec![],
         attributes: vec![Attribute {
-            key: String::from("capital_call_id"),
+            key: format!("{}.capital_call_id", env.contract.address),
             value: format!("{}", state.capital_call_id_sequence),
         }],
         data: Option::None,
