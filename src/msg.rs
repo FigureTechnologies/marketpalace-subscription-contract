@@ -1,5 +1,7 @@
+use crate::state::CapitalCall;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 use cosmwasm_std::Addr;
 
@@ -36,6 +38,7 @@ pub struct CapitalCallIssuance {
 pub enum QueryMsg {
     GetTerms {},
     GetStatus {},
+    GetCapitalCalls {},
 }
 
 #[derive(Deserialize, Serialize)]
@@ -45,4 +48,11 @@ pub struct Terms {
     pub capital_denom: String,
     pub min_commitment: u64,
     pub max_commitment: u64,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct CapitalCalls {
+    pub active_capital_call: Option<CapitalCall>,
+    pub closed_capital_calls: HashSet<CapitalCall>,
+    pub cancelled_capital_calls: HashSet<CapitalCall>,
 }

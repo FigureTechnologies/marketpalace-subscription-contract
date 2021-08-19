@@ -25,6 +25,18 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_capital_calls"
+      ],
+      "properties": {
+        "get_capital_calls": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

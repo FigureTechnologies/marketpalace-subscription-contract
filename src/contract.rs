@@ -9,7 +9,7 @@ use provwasm_std::{
 use std::collections::HashSet;
 
 use crate::error::ContractError;
-use crate::msg::{CapitalCallIssuance, HandleMsg, InstantiateMsg, QueryMsg, Terms};
+use crate::msg::{CapitalCallIssuance, CapitalCalls, HandleMsg, InstantiateMsg, QueryMsg, Terms};
 use crate::state::{config, config_read, CapitalCall, State, Status};
 
 fn contract_error(err: &str) -> ContractError {
@@ -210,10 +210,16 @@ pub fn try_issue_capital_call(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![Attribute {
-            key: format!("{}.capital_call_id", env.contract.address),
-            value: format!("{}", state.capital_call_id_sequence),
-        }],
+        attributes: vec![
+            Attribute {
+                key: format!("{}.capital_call.id", env.contract.address),
+                value: format!("{}", state.capital_call_id_sequence),
+            },
+            Attribute {
+                key: format!("{}.capital_call.amount", env.contract.address),
+                value: format!("{}", capital_call.amount),
+            },
+        ],
         data: Option::None,
     })
 }
@@ -378,6 +384,11 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             max_commitment: state.max_commitment,
         }),
         QueryMsg::GetStatus {} => to_binary(&state.status),
+        QueryMsg::GetCapitalCalls {} => to_binary(&CapitalCalls {
+            active_capital_call: state.active_capital_call,
+            closed_capital_calls: state.closed_capital_calls,
+            cancelled_capital_calls: state.cancelled_capital_calls,
+        }),
     }
 }
 

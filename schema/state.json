@@ -4,7 +4,10 @@
   "type": "object",
   "required": [
     "admin",
+    "cancelled_capital_calls",
+    "capital_call_id_sequence",
     "capital_denom",
+    "closed_capital_calls",
     "commitment_denom",
     "lp",
     "max_commitment",
@@ -13,10 +16,7 @@
     "status"
   ],
   "properties": {
-    "admin": {
-      "$ref": "#/definitions/Addr"
-    },
-    "capital_call": {
+    "active_capital_call": {
       "anyOf": [
         {
           "$ref": "#/definitions/CapitalCall"
@@ -26,8 +26,30 @@
         }
       ]
     },
+    "admin": {
+      "$ref": "#/definitions/Addr"
+    },
+    "cancelled_capital_calls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CapitalCall"
+      },
+      "uniqueItems": true
+    },
+    "capital_call_id_sequence": {
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 0.0
+    },
     "capital_denom": {
       "type": "string"
+    },
+    "closed_capital_calls": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/CapitalCall"
+      },
+      "uniqueItems": true
     },
     "commitment_denom": {
       "type": "string"
@@ -68,7 +90,8 @@
     "CapitalCall": {
       "type": "object",
       "required": [
-        "amount"
+        "amount",
+        "id"
       ],
       "properties": {
         "amount": {
@@ -81,6 +104,11 @@
             "integer",
             "null"
           ],
+          "format": "uint16",
+          "minimum": 0.0
+        },
+        "id": {
+          "type": "integer",
           "format": "uint16",
           "minimum": 0.0
         }
