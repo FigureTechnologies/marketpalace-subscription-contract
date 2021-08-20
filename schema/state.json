@@ -5,7 +5,7 @@
   "required": [
     "admin",
     "cancelled_capital_calls",
-    "capital_call_id_sequence",
+    "capital_call_sequence",
     "capital_denom",
     "closed_capital_calls",
     "commitment_denom",
@@ -36,7 +36,7 @@
       },
       "uniqueItems": true
     },
-    "capital_call_id_sequence": {
+    "capital_call_sequence": {
       "type": "integer",
       "format": "uint16",
       "minimum": 0.0
@@ -91,7 +91,7 @@
       "type": "object",
       "required": [
         "amount",
-        "id"
+        "sequence"
       ],
       "properties": {
         "amount": {
@@ -107,7 +107,7 @@
           "format": "uint16",
           "minimum": 0.0
         },
-        "id": {
+        "sequence": {
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0

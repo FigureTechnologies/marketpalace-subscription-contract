@@ -19,7 +19,7 @@ pub struct State {
     pub min_commitment: u64,
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,
-    pub capital_call_id_sequence: u16,
+    pub capital_call_sequence: u16,
     pub active_capital_call: Option<CapitalCall>,
     pub closed_capital_calls: HashSet<CapitalCall>,
     pub cancelled_capital_calls: HashSet<CapitalCall>,
@@ -33,14 +33,14 @@ pub enum Status {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
 pub struct CapitalCall {
-    pub id: u16,
+    pub sequence: u16,
     pub amount: u64,
     pub days_of_notice: Option<u16>,
 }
 
 impl PartialEq for CapitalCall {
     fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
+        self.sequence == other.sequence
     }
 }
 
@@ -49,7 +49,7 @@ impl Hash for CapitalCall {
     where
         H: std::hash::Hasher,
     {
-        self.id.hash(state);
+        self.sequence.hash(state);
     }
 }
 

@@ -52,7 +52,7 @@ pub struct Terms {
 
 #[derive(Deserialize, Serialize)]
 pub struct CapitalCalls {
-    pub active_capital_call: Option<CapitalCall>,
-    pub closed_capital_calls: HashSet<CapitalCall>,
-    pub cancelled_capital_calls: HashSet<CapitalCall>,
+    pub active: Option<CapitalCall>,
+    pub closed: HashSet<CapitalCall>,
+    pub cancelled: HashSet<CapitalCall>,
 }

@@ -35,7 +35,7 @@ pub fn instantiate(
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
-        capital_call_id_sequence: 0,
+        capital_call_sequence: 0,
         active_capital_call: None,
         closed_capital_calls: HashSet::new(),
         cancelled_capital_calls: HashSet::new(),
@@ -195,9 +195,9 @@ pub fn try_issue_capital_call(
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.capital_call_id_sequence += 1;
+        state.capital_call_sequence += 1;
         let replaced = state.active_capital_call.replace(CapitalCall {
-            id: state.capital_call_id_sequence,
+            sequence: state.capital_call_sequence,
             amount: capital_call.amount,
             days_of_notice: capital_call.days_of_notice,
         });
@@ -213,7 +213,7 @@ pub fn try_issue_capital_call(
         attributes: vec![
             Attribute {
                 key: format!("{}.capital_call.id", env.contract.address),
-                value: format!("{}", state.capital_call_id_sequence),
+                value: format!("{}", state.capital_call_sequence),
             },
             Attribute {
                 key: format!("{}.capital_call.amount", env.contract.address),
@@ -385,9 +385,9 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
         }),
         QueryMsg::GetStatus {} => to_binary(&state.status),
         QueryMsg::GetCapitalCalls {} => to_binary(&CapitalCalls {
-            active_capital_call: state.active_capital_call,
-            closed_capital_calls: state.closed_capital_calls,
-            cancelled_capital_calls: state.cancelled_capital_calls,
+            active: state.active_capital_call,
+            closed: state.closed_capital_calls,
+            cancelled: state.cancelled_capital_calls,
         }),
     }
 }
@@ -448,7 +448,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -481,7 +481,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -514,7 +514,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -555,7 +555,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -592,9 +592,9 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: Some(CapitalCall {
-                    id: 1,
+                    sequence: 1,
                     amount: 10_000,
                     days_of_notice: None,
                 }),
@@ -630,7 +630,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -662,7 +662,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
@@ -694,7 +694,7 @@ mod tests {
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
-                capital_call_id_sequence: 0,
+                capital_call_sequence: 0,
                 active_capital_call: None,
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
