@@ -207,12 +207,14 @@ pub fn try_issue_capital_call(
         Ok(state)
     })?;
 
+    let state = config_read(deps.storage).load()?;
+
     Ok(Response {
         submessages: vec![],
         messages: vec![],
         attributes: vec![
             Attribute {
-                key: format!("{}.capital_call.id", env.contract.address),
+                key: format!("{}.capital_call.sequence", env.contract.address),
                 value: format!("{}", state.capital_call_sequence),
             },
             Attribute {
