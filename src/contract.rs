@@ -64,7 +64,7 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
         }
-        HandleMsg::CloseCapitalCall {} => try_close_capital_call(deps, info),
+        HandleMsg::CloseCapitalCall {} => try_close_capital_call(deps, env, info),
         HandleMsg::IssueRedemption { redemption } => try_issue_redemption(deps, info, redemption),
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
         HandleMsg::Redeem {} => try_redeem(deps, env, info),
@@ -212,22 +212,17 @@ pub fn try_issue_capital_call(
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![
-            Attribute {
-                key: format!("{}.capital_call.sequence", env.contract.address),
-                value: format!("{}", state.capital_call_sequence),
-            },
-            Attribute {
-                key: format!("{}.capital_call.amount", env.contract.address),
-                value: format!("{}", capital_call.amount),
-            },
-        ],
+        attributes: vec![Attribute {
+            key: format!("{}.capital_call.sequence", env.contract.address),
+            value: format!("{}", state.capital_call_sequence),
+        }],
         data: Option::None,
     })
 }
 
 pub fn try_close_capital_call(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -272,7 +267,10 @@ pub fn try_close_capital_call(
     Ok(Response {
         submessages: vec![],
         messages: vec![send],
-        attributes: vec![],
+        attributes: vec![Attribute {
+            key: format!("{}.capital_call.sequence", env.contract.address),
+            value: format!("{}", state.capital_call_sequence),
+        }],
         data: Option::None,
     })
 }
