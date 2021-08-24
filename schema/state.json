@@ -5,7 +5,6 @@
   "required": [
     "admin",
     "cancelled_capital_calls",
-    "capital_call_sequence",
     "capital_denom",
     "closed_capital_calls",
     "commitment_denom",
@@ -13,6 +12,8 @@
     "max_commitment",
     "min_commitment",
     "raise",
+    "redemptions",
+    "sequence",
     "status"
   ],
   "properties": {
@@ -35,11 +36,6 @@
         "$ref": "#/definitions/CapitalCall"
       },
       "uniqueItems": true
-    },
-    "capital_call_sequence": {
-      "type": "integer",
-      "format": "uint16",
-      "minimum": 0.0
     },
     "capital_denom": {
       "type": "string"
@@ -78,6 +74,18 @@
     "raise": {
       "$ref": "#/definitions/Addr"
     },
+    "redemptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Redemption"
+      },
+      "uniqueItems": true
+    },
+    "sequence": {
+      "type": "integer",
+      "format": "uint16",
+      "minimum": 0.0
+    },
     "status": {
       "$ref": "#/definitions/Status"
     }
@@ -105,6 +113,25 @@
             "null"
           ],
           "format": "uint16",
+          "minimum": 0.0
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Redemption": {
+      "type": "object",
+      "required": [
+        "amount",
+        "sequence"
+      ],
+      "properties": {
+        "amount": {
+          "type": "integer",
+          "format": "uint64",
           "minimum": 0.0
         },
         "sequence": {

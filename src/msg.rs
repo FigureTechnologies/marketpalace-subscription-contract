@@ -1,4 +1,4 @@
-use crate::state::CapitalCall;
+use crate::state::{CapitalCall, Redemption};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -38,7 +38,7 @@ pub struct CapitalCallIssuance {
 pub enum QueryMsg {
     GetTerms {},
     GetStatus {},
-    GetCapitalCalls {},
+    GetTransactions {},
 }
 
 #[derive(Deserialize, Serialize)]
@@ -55,4 +55,10 @@ pub struct CapitalCalls {
     pub active: Option<CapitalCall>,
     pub closed: HashSet<CapitalCall>,
     pub cancelled: HashSet<CapitalCall>,
+}
+
+#[derive(Deserialize, Serialize)]
+pub struct Transactions {
+    pub capital_calls: CapitalCalls,
+    pub redemptions: HashSet<Redemption>,
 }
