@@ -57,7 +57,8 @@ impl Hash for CapitalCall {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
 pub struct Redemption {
     pub sequence: u16,
-    pub amount: u64,
+    pub investment: u64,
+    pub capital: u64,
 }
 
 impl PartialEq for Redemption {

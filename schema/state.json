@@ -125,11 +125,17 @@
     "Redemption": {
       "type": "object",
       "required": [
-        "amount",
+        "capital",
+        "investment",
         "sequence"
       ],
       "properties": {
-        "amount": {
+        "capital": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
+        "investment": {
           "type": "integer",
           "format": "uint64",
           "minimum": 0.0
