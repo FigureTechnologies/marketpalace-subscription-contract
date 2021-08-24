@@ -311,7 +311,7 @@ pub fn try_issue_redemption(
         state.sequence += 1;
         state.redemptions.insert(Redemption {
             sequence: state.sequence,
-            investment: redemption,
+            asset: redemption,
             capital: payment.amount.u128() as u64,
         });
         Ok(state)
