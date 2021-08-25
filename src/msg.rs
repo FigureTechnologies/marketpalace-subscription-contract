@@ -1,4 +1,4 @@
-use crate::state::{CapitalCall, Redemption};
+use crate::state::{CapitalCall, Distribution, Redemption};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -61,4 +61,5 @@ pub struct CapitalCalls {
 pub struct Transactions {
     pub capital_calls: CapitalCalls,
     pub redemptions: HashSet<Redemption>,
+    pub distributions: HashSet<Distribution>,
 }

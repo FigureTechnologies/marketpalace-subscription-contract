@@ -12,7 +12,7 @@ use crate::error::ContractError;
 use crate::msg::{
     CapitalCallIssuance, CapitalCalls, HandleMsg, InstantiateMsg, QueryMsg, Terms, Transactions,
 };
-use crate::state::{config, config_read, CapitalCall, Redemption, State, Status};
+use crate::state::{config, config_read, CapitalCall, Distribution, Redemption, State, Status};
 
 fn contract_error(err: &str) -> ContractError {
     ContractError::Std(StdError::generic_err(err))
@@ -42,6 +42,7 @@ pub fn instantiate(
         closed_capital_calls: HashSet::new(),
         cancelled_capital_calls: HashSet::new(),
         redemptions: HashSet::new(),
+        distributions: HashSet::new(),
     };
     config(deps.storage).save(&state)?;
 
@@ -71,7 +72,7 @@ pub fn execute(
         HandleMsg::IssueRedemption { redemption } => {
             try_issue_redemption(deps, env, info, redemption)
         }
-        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, info),
+        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
         HandleMsg::Redeem {} => try_redeem(deps, env, info),
     }
 }
@@ -338,6 +339,7 @@ pub fn try_issue_redemption(
 
 pub fn try_issue_distribution(
     deps: DepsMut,
+    env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -352,10 +354,33 @@ pub fn try_issue_distribution(
         ));
     }
 
+    let payment = match info.funds.first() {
+        Some(payment) => payment,
+        None => return Err(contract_error("payment required for redemption")),
+    };
+
+    if payment.denom != state.capital_denom {
+        return Err(contract_error("payment should be made in capital denom"));
+    }
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.sequence += 1;
+        state.distributions.insert(Distribution {
+            sequence: state.sequence,
+            amount: payment.amount.u128() as u64,
+        });
+        Ok(state)
+    })?;
+
+    let state = config_read(deps.storage).load()?;
+
     Ok(Response {
         submessages: vec![],
         messages: vec![],
-        attributes: vec![],
+        attributes: vec![Attribute {
+            key: format!("{}.distribution.sequence", env.contract.address),
+            value: format!("{}", state.sequence),
+        }],
         data: Option::None,
     })
 }
@@ -412,6 +437,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                 cancelled: state.cancelled_capital_calls,
             },
             redemptions: state.redemptions,
+            distributions: state.distributions,
         }),
     }
 }
@@ -477,6 +503,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -511,6 +538,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -545,6 +573,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -587,6 +616,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -629,6 +659,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -664,6 +695,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -697,6 +729,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 
@@ -730,6 +763,7 @@ mod tests {
                 closed_capital_calls: HashSet::new(),
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
+                distributions: HashSet::new(),
             })
             .unwrap();
 

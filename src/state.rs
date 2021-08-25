@@ -24,6 +24,7 @@ pub struct State {
     pub closed_capital_calls: HashSet<CapitalCall>,
     pub cancelled_capital_calls: HashSet<CapitalCall>,
     pub redemptions: HashSet<Redemption>,
+    pub distributions: HashSet<Distribution>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -68,6 +69,27 @@ impl PartialEq for Redemption {
 }
 
 impl Hash for Redemption {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: std::hash::Hasher,
+    {
+        self.sequence.hash(state);
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
+pub struct Distribution {
+    pub sequence: u16,
+    pub amount: u64,
+}
+
+impl PartialEq for Distribution {
+    fn eq(&self, other: &Self) -> bool {
+        self.sequence == other.sequence
+    }
+}
+
+impl Hash for Distribution {
     fn hash<H>(&self, state: &mut H)
     where
         H: std::hash::Hasher,

@@ -8,6 +8,7 @@
     "capital_denom",
     "closed_capital_calls",
     "commitment_denom",
+    "distributions",
     "lp",
     "max_commitment",
     "min_commitment",
@@ -49,6 +50,13 @@
     },
     "commitment_denom": {
       "type": "string"
+    },
+    "distributions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Distribution"
+      },
+      "uniqueItems": true
     },
     "lp": {
       "$ref": "#/definitions/Addr"
@@ -113,6 +121,25 @@
             "null"
           ],
           "format": "uint16",
+          "minimum": 0.0
+        },
+        "sequence": {
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0.0
+        }
+      }
+    },
+    "Distribution": {
+      "type": "object",
+      "required": [
+        "amount",
+        "sequence"
+      ],
+      "properties": {
+        "amount": {
+          "type": "integer",
+          "format": "uint64",
           "minimum": 0.0
         },
         "sequence": {
