@@ -319,7 +319,7 @@ pub fn try_issue_redemption(
 
     let send = BankMsg::Send {
         to_address: state.raise.to_string(),
-        amount: coins(redemption as u128, format!("investment_{}", state.raise)),
+        amount: coins(redemption as u128, format!("{}.investment", state.raise)),
     }
     .into();
 
