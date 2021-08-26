@@ -356,7 +356,7 @@ pub fn try_issue_distribution(
 
     let payment = match info.funds.first() {
         Some(payment) => payment,
-        None => return Err(contract_error("payment required for redemption")),
+        None => return Err(contract_error("payment required for distribution")),
     };
 
     if payment.denom != state.capital_denom {
