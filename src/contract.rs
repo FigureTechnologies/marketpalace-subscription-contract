@@ -76,7 +76,7 @@ pub fn execute(
             try_issue_redemption(deps, env, info, redemption)
         }
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
-        HandleMsg::IssueWithdrawal {} => try_issue_withdrawal(deps, env, info),
+        HandleMsg::IssueWithdrawal { amount } => try_issue_withdrawal(deps, env, info, amount),
     }
 }
 
@@ -392,6 +392,7 @@ pub fn try_issue_withdrawal(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -403,20 +404,16 @@ pub fn try_issue_withdrawal(
         return Err(contract_error("only the lp can withdraw"));
     }
 
-    let balance = deps
-        .querier
-        .query_balance(env.contract.address.clone(), state.capital_denom)?;
     let send = BankMsg::Send {
         to_address: state.lp.to_string(),
-        amount: vec![balance.clone()],
-    }
-    .into();
+        amount: coins(amount as u128, state.capital_denom),
+    };
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.sequence += 1;
         state.withdrawals.insert(Withdrawal {
             sequence: state.sequence,
-            amount: balance.amount.u128() as u64,
+            amount,
         });
         Ok(state)
     })?;
@@ -425,7 +422,7 @@ pub fn try_issue_withdrawal(
 
     Ok(Response {
         submessages: vec![],
-        messages: vec![send],
+        messages: vec![send.into()],
         attributes: vec![Attribute {
             key: format!("{}.withdrawal.sequence", env.contract.address),
             value: format!("{}", state.sequence),
@@ -796,7 +793,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("lp", &vec![]),
-            HandleMsg::IssueWithdrawal {},
+            HandleMsg::IssueWithdrawal { amount: 10_000 },
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
