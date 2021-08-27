@@ -452,6 +452,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             },
             redemptions: state.redemptions,
             distributions: state.distributions,
+            withdrawals: state.withdrawals,
         }),
     }
 }
