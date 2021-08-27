@@ -12,7 +12,9 @@ use crate::error::ContractError;
 use crate::msg::{
     CapitalCallIssuance, CapitalCalls, HandleMsg, InstantiateMsg, QueryMsg, Terms, Transactions,
 };
-use crate::state::{config, config_read, CapitalCall, Distribution, Redemption, State, Status};
+use crate::state::{
+    config, config_read, CapitalCall, Distribution, Redemption, State, Status, Withdrawal,
+};
 
 fn contract_error(err: &str) -> ContractError {
     ContractError::Std(StdError::generic_err(err))
@@ -43,6 +45,7 @@ pub fn instantiate(
         cancelled_capital_calls: HashSet::new(),
         redemptions: HashSet::new(),
         distributions: HashSet::new(),
+        withdrawals: HashSet::new(),
     };
     config(deps.storage).save(&state)?;
 
@@ -73,7 +76,7 @@ pub fn execute(
             try_issue_redemption(deps, env, info, redemption)
         }
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
-        HandleMsg::Redeem {} => try_redeem(deps, env, info),
+        HandleMsg::IssueWithdrawal {} => try_issue_withdrawal(deps, env, info),
     }
 }
 
@@ -385,7 +388,7 @@ pub fn try_issue_distribution(
     })
 }
 
-pub fn try_redeem(
+pub fn try_issue_withdrawal(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
@@ -397,22 +400,36 @@ pub fn try_redeem(
     }
 
     if info.sender != state.lp {
-        return Err(contract_error("only the lp can redeem distribution"));
+        return Err(contract_error("only the lp can withdraw"));
     }
 
     let balance = deps
         .querier
-        .query_balance(env.contract.address, state.capital_denom)?;
+        .query_balance(env.contract.address.clone(), state.capital_denom)?;
     let send = BankMsg::Send {
         to_address: state.lp.to_string(),
-        amount: vec![balance],
+        amount: vec![balance.clone()],
     }
     .into();
+
+    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
+        state.sequence += 1;
+        state.withdrawals.insert(Withdrawal {
+            sequence: state.sequence,
+            amount: balance.amount.u128() as u64,
+        });
+        Ok(state)
+    })?;
+
+    let state = config_read(deps.storage).load()?;
 
     Ok(Response {
         submessages: vec![],
         messages: vec![send],
-        attributes: vec![],
+        attributes: vec![Attribute {
+            key: format!("{}.withdrawal.sequence", env.contract.address),
+            value: format!("{}", state.sequence),
+        }],
         data: Option::None,
     })
 }
@@ -504,6 +521,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -539,6 +557,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -574,6 +593,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -617,6 +637,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -660,6 +681,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -696,6 +718,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -730,6 +753,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -744,7 +768,7 @@ mod tests {
     }
 
     #[test]
-    fn redeem() {
+    fn withdraw() {
         let mut deps = mock_dependencies(&[]);
 
         config(&mut deps.storage)
@@ -764,6 +788,7 @@ mod tests {
                 cancelled_capital_calls: HashSet::new(),
                 redemptions: HashSet::new(),
                 distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -771,7 +796,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("lp", &vec![]),
-            HandleMsg::Redeem {},
+            HandleMsg::IssueWithdrawal {},
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
