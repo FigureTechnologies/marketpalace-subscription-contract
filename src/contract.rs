@@ -1,5 +1,5 @@
 use cosmwasm_std::{
-    coins, entry_point, to_binary, Addr, Attribute, BankMsg, Binary, Deps, DepsMut, Env,
+    coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env,
     MessageInfo, Response, StdError, StdResult,
 };
 use provwasm_std::{
@@ -49,12 +49,7 @@ pub fn instantiate(
     };
     config(deps.storage).save(&state)?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![],
-        data: Option::None,
-    })
+    Ok(Response::default())
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -96,12 +91,7 @@ pub fn try_recover(
         Ok(state)
     })?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![],
-        data: Option::None,
-    })
+    Ok(Response::default())
 }
 
 pub fn try_accept(
@@ -162,12 +152,7 @@ pub fn try_accept(
         state.raise,
     )?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![create, grant, finalize, activate, withraw],
-        attributes: vec![],
-        data: Option::None,
-    })
+    Ok(Response::new().add_messages(vec![create, grant, finalize, activate, withraw]))
 }
 
 pub fn try_issue_capital_call(
@@ -218,15 +203,10 @@ pub fn try_issue_capital_call(
 
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![Attribute {
-            key: format!("{}.capital_call.sequence", env.contract.address),
-            value: format!("{}", state.sequence),
-        }],
-        data: Option::None,
-    })
+    Ok(Response::new().add_attribute(
+        format!("{}.capital_call.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 pub fn try_close_capital_call(
@@ -270,18 +250,12 @@ pub fn try_close_capital_call(
     let send = BankMsg::Send {
         to_address: state.raise.to_string(),
         amount: coins(capital_call.amount as u128, state.capital_denom),
-    }
-    .into();
+    };
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![send],
-        attributes: vec![Attribute {
-            key: format!("{}.capital_call.sequence", env.contract.address),
-            value: format!("{}", state.sequence),
-        }],
-        data: Option::None,
-    })
+    Ok(Response::new().add_message(send).add_attribute(
+        format!("{}.capital_call.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 pub fn try_issue_redemption(
@@ -324,20 +298,14 @@ pub fn try_issue_redemption(
     let send = BankMsg::Send {
         to_address: state.raise.to_string(),
         amount: coins(redemption as u128, format!("{}.investment", state.raise)),
-    }
-    .into();
+    };
 
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![send],
-        attributes: vec![Attribute {
-            key: format!("{}.redemption.sequence", env.contract.address),
-            value: format!("{}", state.sequence),
-        }],
-        data: Option::None,
-    })
+    Ok(Response::new().add_message(send).add_attribute(
+        format!("{}.redemption.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 pub fn try_issue_distribution(
@@ -377,15 +345,10 @@ pub fn try_issue_distribution(
 
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![],
-        attributes: vec![Attribute {
-            key: format!("{}.distribution.sequence", env.contract.address),
-            value: format!("{}", state.sequence),
-        }],
-        data: Option::None,
-    })
+    Ok(Response::new().add_attribute(
+        format!("{}.distribution.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 pub fn try_issue_withdrawal(
@@ -420,15 +383,10 @@ pub fn try_issue_withdrawal(
 
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response {
-        submessages: vec![],
-        messages: vec![send.into()],
-        attributes: vec![Attribute {
-            key: format!("{}.withdrawal.sequence", env.contract.address),
-            value: format!("{}", state.sequence),
-        }],
-        data: Option::None,
-    })
+    Ok(Response::new().add_message(send).add_attribute(
+        format!("{}.withdrawal.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 #[entry_point]
