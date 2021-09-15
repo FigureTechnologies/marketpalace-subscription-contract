@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult,
+    coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
+    Response, StdError, StdResult,
 };
 use provwasm_std::{
     activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
