@@ -2,10 +2,7 @@ use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
     Response, StdError, StdResult,
 };
-use provwasm_std::{
-    activate_marker, create_marker, finalize_marker, grant_marker_access, withdraw_coins,
-    MarkerAccess, MarkerType, ProvenanceMsg,
-};
+use provwasm_std::ProvenanceMsg;
 use std::collections::HashSet;
 
 use crate::error::ContractError;
@@ -25,7 +22,7 @@ fn contract_error(err: &str) -> ContractError {
 #[entry_point]
 pub fn instantiate(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -35,7 +32,6 @@ pub fn instantiate(
         lp: msg.lp.clone(),
         admin: msg.admin,
         capital_denom: msg.capital_denom,
-        commitment_denom: format!("{}.commitment", env.contract.address),
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
@@ -62,7 +58,7 @@ pub fn execute(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
-        HandleMsg::Accept {} => try_accept(deps, env, info),
+        HandleMsg::Accept {} => try_accept(deps, info),
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
         }
@@ -96,7 +92,6 @@ pub fn try_recover(
 
 pub fn try_accept(
     deps: DepsMut,
-    env: Env,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -109,17 +104,17 @@ pub fn try_accept(
         return Err(contract_error("only the raise contract can accept"));
     }
 
-    let investment = match info.funds.first() {
-        Some(investment) => investment,
-        None => return Err(contract_error("investment required")),
+    let commitment = match info.funds.first() {
+        Some(commitment) => commitment,
+        None => return Err(contract_error("commitment required")),
     };
 
-    if investment.amount.u128() < state.min_commitment.into() {
-        return Err(contract_error("investment less than minimum commitment"));
+    if commitment.amount.u128() < state.min_commitment.into() {
+        return Err(contract_error("commitment less than minimum commitment"));
     }
 
-    if investment.amount.u128() > state.max_commitment.into() {
-        return Err(contract_error("investment more than maximum commitment"));
+    if commitment.amount.u128() > state.max_commitment.into() {
+        return Err(contract_error("commitment more than maximum commitment"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -127,32 +122,7 @@ pub fn try_accept(
         Ok(state)
     })?;
 
-    let create = create_marker(
-        investment.amount.u128(),
-        state.commitment_denom.clone(),
-        MarkerType::Coin,
-    )?;
-    let grant = grant_marker_access(
-        state.commitment_denom.clone(),
-        env.contract.address,
-        vec![
-            MarkerAccess::Admin,
-            MarkerAccess::Mint,
-            MarkerAccess::Burn,
-            MarkerAccess::Withdraw,
-        ],
-    )?;
-    let finalize = finalize_marker(state.commitment_denom.clone())?;
-    let activate = activate_marker(state.commitment_denom.clone())?;
-
-    let withraw = withdraw_coins(
-        state.commitment_denom.clone(),
-        investment.amount.u128(),
-        state.commitment_denom,
-        state.raise,
-    )?;
-
-    Ok(Response::new().add_messages(vec![create, grant, finalize, activate, withraw]))
+    Ok(Response::default())
 }
 
 pub fn try_issue_capital_call(
@@ -175,7 +145,10 @@ pub fn try_issue_capital_call(
 
     let commitment = deps
         .querier
-        .query_balance(state.raise, state.commitment_denom)
+        .query_balance(
+            env.contract.address.clone(),
+            format!("{}.commitment", state.raise),
+        )
         .unwrap();
 
     if capital_call.amount > commitment.amount.u128() as u64 {
@@ -247,15 +220,24 @@ pub fn try_close_capital_call(
         Ok(state)
     })?;
 
-    let send = BankMsg::Send {
+    let send_capital = BankMsg::Send {
         to_address: state.raise.to_string(),
         amount: coins(capital_call.amount as u128, state.capital_denom),
     };
+    let send_commitment = BankMsg::Send {
+        to_address: state.raise.to_string(),
+        amount: coins(
+            capital_call.amount as u128,
+            format!("{}.commitment", state.raise),
+        ),
+    };
 
-    Ok(Response::new().add_message(send).add_attribute(
-        format!("{}.capital_call.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
+    Ok(Response::new()
+        .add_messages(vec![send_capital, send_commitment])
+        .add_attribute(
+            format!("{}.capital_call.sequence", env.contract.address),
+            format!("{}", state.sequence),
+        ))
 }
 
 pub fn try_issue_redemption(
@@ -467,7 +449,6 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -503,7 +484,6 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -539,7 +519,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -560,7 +539,7 @@ mod tests {
             HandleMsg::Accept {},
         )
         .unwrap();
-        assert_eq!(5, res.messages.len());
+        assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
@@ -572,9 +551,10 @@ mod tests {
     fn issue_capital_call() {
         let mut deps = mock_dependencies(&vec![]);
 
-        deps.querier
-            .base
-            .update_balance(Addr::unchecked("raise_1"), coins(10_000, "commitment"));
+        deps.querier.base.update_balance(
+            Addr::unchecked("cosmos2contract"),
+            coins(10_000, "raise_1.commitment"),
+        );
 
         config(&mut deps.storage)
             .save(&State {
@@ -583,7 +563,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -623,7 +602,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -648,7 +626,7 @@ mod tests {
             HandleMsg::CloseCapitalCall {},
         )
         .unwrap();
-        assert_eq!(1, res.messages.len());
+        assert_eq!(2, res.messages.len());
     }
 
     #[test]
@@ -664,7 +642,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -699,7 +676,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -734,7 +710,6 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
-                commitment_denom: String::from("commitment_sub_raise"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
