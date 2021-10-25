@@ -101,6 +101,7 @@ impl Hash for Distribution {
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
 pub struct Withdrawal {
     pub sequence: u16,
+    pub to: Addr,
     pub amount: u64,
 }
 

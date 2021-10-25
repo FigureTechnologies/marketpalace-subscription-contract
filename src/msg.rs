@@ -24,7 +24,7 @@ pub enum HandleMsg {
     CloseCapitalCall {},
     IssueRedemption { redemption: u64 },
     IssueDistribution {},
-    IssueWithdrawal { amount: u64 },
+    IssueWithdrawal { to: Addr, amount: u64 },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

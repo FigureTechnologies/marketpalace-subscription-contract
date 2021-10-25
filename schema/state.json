@@ -7,7 +7,6 @@
     "cancelled_capital_calls",
     "capital_denom",
     "closed_capital_calls",
-    "commitment_denom",
     "distributions",
     "lp",
     "max_commitment",
@@ -48,9 +47,6 @@
         "$ref": "#/definitions/CapitalCall"
       },
       "uniqueItems": true
-    },
-    "commitment_denom": {
-      "type": "string"
     },
     "distributions": {
       "type": "array",
@@ -193,7 +189,8 @@
       "type": "object",
       "required": [
         "amount",
-        "sequence"
+        "sequence",
+        "to"
       ],
       "properties": {
         "amount": {
@@ -205,6 +202,9 @@
           "type": "integer",
           "format": "uint16",
           "minimum": 0.0
+        },
+        "to": {
+          "$ref": "#/definitions/Addr"
         }
       }
     }

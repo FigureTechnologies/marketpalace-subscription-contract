@@ -67,7 +67,9 @@ pub fn execute(
             try_issue_redemption(deps, env, info, redemption)
         }
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
-        HandleMsg::IssueWithdrawal { amount } => try_issue_withdrawal(deps, env, info, amount),
+        HandleMsg::IssueWithdrawal { to, amount } => {
+            try_issue_withdrawal(deps, env, info, to, amount)
+        }
     }
 }
 
@@ -337,6 +339,7 @@ pub fn try_issue_withdrawal(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    to: Addr,
     amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -350,7 +353,7 @@ pub fn try_issue_withdrawal(
     }
 
     let send = BankMsg::Send {
-        to_address: state.lp.to_string(),
+        to_address: to.to_string(),
         amount: coins(amount as u128, state.capital_denom),
     };
 
@@ -358,6 +361,7 @@ pub fn try_issue_withdrawal(
         state.sequence += 1;
         state.withdrawals.insert(Withdrawal {
             sequence: state.sequence,
+            to,
             amount,
         });
         Ok(state)
@@ -727,7 +731,10 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("lp", &vec![]),
-            HandleMsg::IssueWithdrawal { amount: 10_000 },
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+            },
         )
         .unwrap();
         assert_eq!(1, res.messages.len());
