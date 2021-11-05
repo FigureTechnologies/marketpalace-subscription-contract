@@ -29,8 +29,8 @@ pub fn instantiate(
     let state = State {
         raise: info.sender,
         status: Status::Draft,
+        recovery_admin: msg.recovery_admin,
         lp: msg.lp.clone(),
-        admin: msg.admin,
         capital_denom: msg.capital_denom,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
@@ -80,7 +80,7 @@ pub fn try_recover(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
-    if info.sender != state.admin {
+    if info.sender != state.recovery_admin {
         return Err(contract_error("only admin can recover subscription"));
     }
 
@@ -425,8 +425,8 @@ mod tests {
             mock_env(),
             mock_info("lp", &[]),
             InstantiateMsg {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 50_000,
@@ -448,7 +448,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                admin: Addr::unchecked("admin"),
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
@@ -483,7 +483,7 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
-                admin: Addr::unchecked("admin"),
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
@@ -518,10 +518,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
@@ -562,10 +562,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
@@ -601,10 +601,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
@@ -641,10 +641,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
@@ -675,10 +675,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
@@ -709,10 +709,10 @@ mod tests {
 
         config(&mut deps.storage)
             .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
-                admin: Addr::unchecked("admin"),
                 capital_denom: String::from("stable_coin"),
                 min_commitment: 10_000,
                 max_commitment: 100_000,
