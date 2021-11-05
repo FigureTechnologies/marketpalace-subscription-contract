@@ -3,7 +3,6 @@
   "title": "State",
   "type": "object",
   "required": [
-    "admin",
     "cancelled_capital_calls",
     "capital_denom",
     "closed_capital_calls",
@@ -12,6 +11,7 @@
     "max_commitment",
     "min_commitment",
     "raise",
+    "recovery_admin",
     "redemptions",
     "sequence",
     "status",
@@ -27,9 +27,6 @@
           "type": "null"
         }
       ]
-    },
-    "admin": {
-      "$ref": "#/definitions/Addr"
     },
     "cancelled_capital_calls": {
       "type": "array",
@@ -77,6 +74,9 @@
       "minimum": 0.0
     },
     "raise": {
+      "$ref": "#/definitions/Addr"
+    },
+    "recovery_admin": {
       "$ref": "#/definitions/Addr"
     },
     "redemptions": {
