@@ -62,7 +62,9 @@ pub fn execute(
         HandleMsg::IssueCapitalCall { capital_call } => {
             try_issue_capital_call(deps, env, info, capital_call)
         }
-        HandleMsg::CloseCapitalCall {} => try_close_capital_call(deps, env, info),
+        HandleMsg::CloseCapitalCall { is_retroactive } => {
+            try_close_capital_call(deps, env, info, is_retroactive)
+        }
         HandleMsg::IssueRedemption { redemption } => {
             try_issue_redemption(deps, env, info, redemption)
         }
@@ -188,6 +190,7 @@ pub fn try_close_capital_call(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    is_retroactive: bool,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -206,13 +209,13 @@ pub fn try_close_capital_call(
         None => return Err(contract_error("no existing capital call issued")),
     };
 
-    let commitment = match info.funds.first() {
-        Some(commitment) => commitment,
-        None => return Err(contract_error("no commitment provided")),
+    let investment = match info.funds.first() {
+        Some(investment) => investment,
+        None => return Err(contract_error("no investment provided")),
     };
 
-    if commitment.amount.u128() != u128::from(capital_call.amount) {
-        return Err(contract_error("incorrect commitment provided"));
+    if investment.amount.u128() != u128::from(capital_call.amount) {
+        return Err(contract_error("incorrect investment provided"));
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -235,7 +238,11 @@ pub fn try_close_capital_call(
     };
 
     Ok(Response::new()
-        .add_messages(vec![send_capital, send_commitment])
+        .add_messages(if is_retroactive {
+            vec![send_commitment]
+        } else {
+            vec![send_capital, send_commitment]
+        })
         .add_attribute(
             format!("{}.capital_call.sequence", env.contract.address),
             format!("{}", state.sequence),
@@ -627,7 +634,9 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("raise_1", &coins(10_000, "commitment")),
-            HandleMsg::CloseCapitalCall {},
+            HandleMsg::CloseCapitalCall {
+                is_retroactive: false,
+            },
         )
         .unwrap();
         assert_eq!(2, res.messages.len());

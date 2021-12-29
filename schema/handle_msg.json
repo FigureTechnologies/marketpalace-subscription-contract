@@ -61,7 +61,15 @@
       ],
       "properties": {
         "close_capital_call": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "is_retroactive"
+          ],
+          "properties": {
+            "is_retroactive": {
+              "type": "boolean"
+            }
+          }
         }
       },
       "additionalProperties": false

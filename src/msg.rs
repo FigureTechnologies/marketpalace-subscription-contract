@@ -21,7 +21,7 @@ pub enum HandleMsg {
     Recover { lp: Addr },
     Accept {},
     IssueCapitalCall { capital_call: CapitalCallIssuance },
-    CloseCapitalCall {},
+    CloseCapitalCall { is_retroactive: bool },
     IssueRedemption { redemption: u64 },
     IssueDistribution {},
     IssueWithdrawal { to: Addr, amount: u64 },
