@@ -65,9 +65,11 @@ pub fn execute(
         HandleMsg::CloseCapitalCall { is_retroactive } => {
             try_close_capital_call(deps, env, info, is_retroactive)
         }
-        HandleMsg::IssueRedemption { redemption } => {
-            try_issue_redemption(deps, env, info, redemption)
-        }
+        HandleMsg::IssueRedemption {
+            redemption,
+            payment,
+            is_retroactive,
+        } => try_issue_redemption(deps, env, info, redemption, payment, is_retroactive),
         HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
         HandleMsg::IssueWithdrawal { to, amount } => {
             try_issue_withdrawal(deps, env, info, to, amount)
@@ -254,6 +256,8 @@ pub fn try_issue_redemption(
     env: Env,
     info: MessageInfo,
     redemption: u64,
+    payment: u64,
+    is_retroactive: bool,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -267,13 +271,19 @@ pub fn try_issue_redemption(
         ));
     }
 
-    let payment = match info.funds.first() {
-        Some(payment) => payment,
-        None => return Err(contract_error("payment required for redemption")),
-    };
+    if !is_retroactive {
+        let sent = match info.funds.first() {
+            Some(sent) => sent,
+            None => return Err(contract_error("payment required for redemption")),
+        };
 
-    if payment.denom != state.capital_denom {
-        return Err(contract_error("payment should be made in capital denom"));
+        if sent.denom != state.capital_denom {
+            return Err(contract_error("payment should be made in capital denom"));
+        }
+
+        if sent.amount.u128() != payment.into() {
+            return Err(contract_error("sent funds should match specified payment"));
+        }
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -281,7 +291,7 @@ pub fn try_issue_redemption(
         state.redemptions.insert(Redemption {
             sequence: state.sequence,
             asset: redemption,
-            capital: payment.amount.u128() as u64,
+            capital: payment,
         });
         Ok(state)
     })?;
@@ -671,8 +681,12 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &coins(5_000, "stable_coin")),
-            HandleMsg::IssueRedemption { redemption: 5_000 },
+            mock_info("raise_1", &coins(2_500, "stable_coin")),
+            HandleMsg::IssueRedemption {
+                redemption: 5_000,
+                payment: 2_500,
+                is_retroactive: false,
+            },
         )
         .unwrap();
         assert_eq!(1, res.messages.len());

@@ -18,13 +18,26 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Recover { lp: Addr },
+    Recover {
+        lp: Addr,
+    },
     Accept {},
-    IssueCapitalCall { capital_call: CapitalCallIssuance },
-    CloseCapitalCall { is_retroactive: bool },
-    IssueRedemption { redemption: u64 },
+    IssueCapitalCall {
+        capital_call: CapitalCallIssuance,
+    },
+    CloseCapitalCall {
+        is_retroactive: bool,
+    },
+    IssueRedemption {
+        redemption: u64,
+        payment: u64,
+        is_retroactive: bool,
+    },
     IssueDistribution {},
-    IssueWithdrawal { to: Addr, amount: u64 },
+    IssueWithdrawal {
+        to: Addr,
+        amount: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
