@@ -113,7 +113,21 @@
       ],
       "properties": {
         "issue_distribution": {
-          "type": "object"
+          "type": "object",
+          "required": [
+            "is_retroactive",
+            "payment"
+          ],
+          "properties": {
+            "is_retroactive": {
+              "type": "boolean"
+            },
+            "payment": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
         }
       },
       "additionalProperties": false

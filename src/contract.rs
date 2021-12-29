@@ -70,7 +70,10 @@ pub fn execute(
             payment,
             is_retroactive,
         } => try_issue_redemption(deps, env, info, redemption, payment, is_retroactive),
-        HandleMsg::IssueDistribution {} => try_issue_distribution(deps, env, info),
+        HandleMsg::IssueDistribution {
+            payment,
+            is_retroactive,
+        } => try_issue_distribution(deps, env, info, payment, is_retroactive),
         HandleMsg::IssueWithdrawal { to, amount } => {
             try_issue_withdrawal(deps, env, info, to, amount)
         }
@@ -313,6 +316,8 @@ pub fn try_issue_distribution(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
+    payment: u64,
+    is_retroactive: bool,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -326,20 +331,26 @@ pub fn try_issue_distribution(
         ));
     }
 
-    let payment = match info.funds.first() {
-        Some(payment) => payment,
-        None => return Err(contract_error("payment required for distribution")),
-    };
+    if !is_retroactive {
+        let sent = match info.funds.first() {
+            Some(sent) => sent,
+            None => return Err(contract_error("payment required for distribution")),
+        };
 
-    if payment.denom != state.capital_denom {
-        return Err(contract_error("payment should be made in capital denom"));
+        if sent.denom != state.capital_denom {
+            return Err(contract_error("payment should be made in capital denom"));
+        }
+
+        if sent.amount.u128() != payment.into() {
+            return Err(contract_error("sent funds should match specified payment"));
+        }
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.sequence += 1;
         state.distributions.insert(Distribution {
             sequence: state.sequence,
-            amount: payment.amount.u128() as u64,
+            amount: payment,
         });
         Ok(state)
     })?;
@@ -720,7 +731,10 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("raise_1", &coins(5_000, "stable_coin")),
-            HandleMsg::IssueDistribution {},
+            HandleMsg::IssueDistribution {
+                payment: 5_000,
+                is_retroactive: false,
+            },
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
