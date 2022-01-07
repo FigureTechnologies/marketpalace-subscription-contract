@@ -5,6 +5,7 @@
   "required": [
     "cancelled_capital_calls",
     "capital_denom",
+    "capital_per_share",
     "closed_capital_calls",
     "distributions",
     "lp",
@@ -37,6 +38,11 @@
     },
     "capital_denom": {
       "type": "string"
+    },
+    "capital_per_share": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     },
     "closed_capital_calls": {
       "type": "array",

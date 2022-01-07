@@ -13,8 +13,8 @@ use crate::state::{
     config, config_read, CapitalCall, Distribution, Redemption, State, Status, Withdrawal,
 };
 
-fn contract_error(err: &str) -> ContractError {
-    ContractError::Std(StdError::generic_err(err))
+fn contract_error<T>(err: &str) -> Result<T, ContractError> {
+    Err(ContractError::Std(StdError::generic_err(err)))
 }
 
 // Note, you can use StdResult in some functions where you do not
@@ -32,6 +32,7 @@ pub fn instantiate(
         recovery_admin: msg.recovery_admin,
         lp: msg.lp.clone(),
         capital_denom: msg.capital_denom,
+        capital_per_share: msg.capital_per_share,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
         min_days_of_notice: msg.min_days_of_notice,
@@ -43,9 +44,28 @@ pub fn instantiate(
         distributions: HashSet::new(),
         withdrawals: HashSet::new(),
     };
+
+    if state.not_evenly_divisble(msg.min_commitment) {
+        return contract_error("min commitment must be evenly divisible by capital per share");
+    }
+
+    if state.not_evenly_divisble(msg.max_commitment) {
+        return contract_error("max commitment must be evenly divisible by capital per share");
+    }
+
     config(deps.storage).save(&state)?;
 
     Ok(Response::default())
+}
+
+impl State {
+    fn not_evenly_divisble(&self, amount: u64) -> bool {
+        amount % self.capital_per_share > 0
+    }
+
+    fn capital_to_shares(&self, amount: u64) -> u64 {
+        amount / self.capital_per_share
+    }
 }
 
 // And declare a custom Error variant for the ones where you will want to make use of it
@@ -88,7 +108,7 @@ pub fn try_recover(
     let state = config_read(deps.storage).load()?;
 
     if info.sender != state.recovery_admin {
-        return Err(contract_error("only admin can recover subscription"));
+        return contract_error("only admin can recover subscription");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -106,24 +126,24 @@ pub fn try_accept(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Draft {
-        return Err(contract_error("subscription is not in draft status"));
+        return contract_error("subscription is not in draft status");
     }
 
     if info.sender != state.raise {
-        return Err(contract_error("only the raise contract can accept"));
+        return contract_error("only the raise contract can accept");
     }
 
     let commitment = match info.funds.first() {
         Some(commitment) => commitment,
-        None => return Err(contract_error("commitment required")),
+        None => return contract_error("commitment required"),
     };
 
     if commitment.amount.u128() < state.min_commitment.into() {
-        return Err(contract_error("commitment less than minimum commitment"));
+        return contract_error("commitment less than minimum commitment");
     }
 
     if commitment.amount.u128() > state.max_commitment.into() {
-        return Err(contract_error("commitment more than maximum commitment"));
+        return contract_error("commitment more than maximum commitment");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -143,13 +163,11 @@ pub fn try_issue_capital_call(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("subscription is not accepted"));
+        return contract_error("subscription is not accepted");
     }
 
     if info.sender != state.raise {
-        return Err(contract_error(
-            "only the raise contract can issue capital call",
-        ));
+        return contract_error("only the raise contract can issue capital call");
     }
 
     let commitment = deps
@@ -161,13 +179,11 @@ pub fn try_issue_capital_call(
         .unwrap();
 
     if capital_call.amount > commitment.amount.u128() as u64 {
-        return Err(contract_error(
-            "capital call larger than remaining commitment",
-        ));
+        return contract_error("capital call larger than remaining commitment");
     }
 
     if capital_call.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
-        return Err(contract_error("not enough notice"));
+        return contract_error("not enough notice");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -200,27 +216,25 @@ pub fn try_close_capital_call(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("subscription is not accepted"));
+        return contract_error("subscription is not accepted");
     }
 
     if info.sender != state.raise {
-        return Err(contract_error(
-            "only the raise contract can close capital call",
-        ));
+        return contract_error("only the raise contract can close capital call");
     }
 
     let capital_call = match state.active_capital_call {
-        Some(capital_call) => capital_call,
-        None => return Err(contract_error("no existing capital call issued")),
+        Some(ref capital_call) => capital_call,
+        None => return contract_error("no existing capital call issued"),
     };
 
     let investment = match info.funds.first() {
         Some(investment) => investment,
-        None => return Err(contract_error("no investment provided")),
+        None => return contract_error("no investment provided"),
     };
 
-    if investment.amount.u128() != u128::from(capital_call.amount) {
-        return Err(contract_error("incorrect investment provided"));
+    if investment.amount.u128() != u128::from(state.capital_to_shares(capital_call.amount)) {
+        return contract_error("incorrect investment provided");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
@@ -232,12 +246,12 @@ pub fn try_close_capital_call(
 
     let send_capital = BankMsg::Send {
         to_address: state.raise.to_string(),
-        amount: coins(capital_call.amount as u128, state.capital_denom),
+        amount: coins(capital_call.amount as u128, state.capital_denom.clone()),
     };
     let send_commitment = BankMsg::Send {
         to_address: state.raise.to_string(),
         amount: coins(
-            capital_call.amount as u128,
+            state.capital_to_shares(capital_call.amount) as u128,
             format!("{}.commitment", state.raise),
         ),
     };
@@ -265,27 +279,25 @@ pub fn try_issue_redemption(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("subscription is not accepted"));
+        return contract_error("subscription is not accepted");
     }
 
     if info.sender != state.raise {
-        return Err(contract_error(
-            "only the raise contract can issue redemption",
-        ));
+        return contract_error("only the raise contract can issue redemption");
     }
 
     if !is_retroactive {
         let sent = match info.funds.first() {
             Some(sent) => sent,
-            None => return Err(contract_error("payment required for redemption")),
+            None => return contract_error("payment required for redemption"),
         };
 
         if sent.denom != state.capital_denom {
-            return Err(contract_error("payment should be made in capital denom"));
+            return contract_error("payment should be made in capital denom");
         }
 
         if sent.amount.u128() != payment.into() {
-            return Err(contract_error("sent funds should match specified payment"));
+            return contract_error("sent funds should match specified payment");
         }
     }
 
@@ -322,27 +334,25 @@ pub fn try_issue_distribution(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("subscription has not been accepted"));
+        return contract_error("subscription has not been accepted");
     }
 
     if info.sender != state.raise {
-        return Err(contract_error(
-            "only the raise contract can issue redemption",
-        ));
+        return contract_error("only the raise contract can issue redemption");
     }
 
     if !is_retroactive {
         let sent = match info.funds.first() {
             Some(sent) => sent,
-            None => return Err(contract_error("payment required for distribution")),
+            None => return contract_error("payment required for distribution"),
         };
 
         if sent.denom != state.capital_denom {
-            return Err(contract_error("payment should be made in capital denom"));
+            return contract_error("payment should be made in capital denom");
         }
 
         if sent.amount.u128() != payment.into() {
-            return Err(contract_error("sent funds should match specified payment"));
+            return contract_error("sent funds should match specified payment");
         }
     }
 
@@ -373,11 +383,11 @@ pub fn try_issue_withdrawal(
     let state = config_read(deps.storage).load()?;
 
     if state.status != Status::Accepted {
-        return Err(contract_error("subscription has not been accepted"));
+        return contract_error("subscription has not been accepted");
     }
 
     if info.sender != state.lp {
-        return Err(contract_error("only the lp can withdraw"));
+        return contract_error("only the lp can withdraw");
     }
 
     let send = BankMsg::Send {
@@ -456,6 +466,7 @@ mod tests {
                 recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 50_000,
                 min_days_of_notice: None,
@@ -481,6 +492,7 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -516,6 +528,7 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -551,6 +564,7 @@ mod tests {
                 status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -595,6 +609,7 @@ mod tests {
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -625,7 +640,7 @@ mod tests {
 
     #[test]
     fn close_capital_call() {
-        let mut deps = mock_dependencies(&coins(10_000, "stable_coin"));
+        let mut deps = mock_dependencies(&coins(100_000, "stable_coin"));
 
         config(&mut deps.storage)
             .save(&State {
@@ -634,13 +649,14 @@ mod tests {
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
                 sequence: 0,
                 active_capital_call: Some(CapitalCall {
                     sequence: 1,
-                    amount: 10_000,
+                    amount: 100_000,
                     days_of_notice: None,
                 }),
                 closed_capital_calls: HashSet::new(),
@@ -654,7 +670,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &coins(10_000, "commitment")),
+            mock_info("raise_1", &coins(1_000, "investment")),
             HandleMsg::CloseCapitalCall {
                 is_retroactive: false,
             },
@@ -676,6 +692,7 @@ mod tests {
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -714,6 +731,7 @@ mod tests {
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
@@ -751,6 +769,7 @@ mod tests {
                 status: Status::Accepted,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
                 min_days_of_notice: Some(10),
