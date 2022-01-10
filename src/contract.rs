@@ -509,6 +509,50 @@ mod tests {
     }
 
     #[test]
+    fn init_with_bad_min() {
+        let mut deps = mock_dependencies(&[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &[]),
+            InstantiateMsg {
+                recovery_admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
+                min_commitment: 10_001,
+                max_commitment: 50_000,
+                min_days_of_notice: None,
+            },
+        );
+        assert_eq!(true, res.is_err());
+    }
+
+    #[test]
+    fn init_with_bad_max() {
+        let mut deps = mock_dependencies(&[]);
+
+        // we can just call .unwrap() to assert this was a success
+        let res = instantiate(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &[]),
+            InstantiateMsg {
+                recovery_admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
+                min_commitment: 10_000,
+                max_commitment: 50_001,
+                min_days_of_notice: None,
+            },
+        );
+        assert_eq!(true, res.is_err());
+    }
+
+    #[test]
     fn recover() {
         let mut deps = mock_dependencies(&[]);
 
@@ -663,6 +707,50 @@ mod tests {
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn issue_capital_call_with_bad_amount() {
+        let mut deps = mock_dependencies(&vec![]);
+
+        deps.querier.base.update_balance(
+            Addr::unchecked("cosmos2contract"),
+            coins(10_000, "raise_1.commitment"),
+        );
+
+        config(&mut deps.storage)
+            .save(&State {
+                recovery_admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                status: Status::Accepted,
+                raise: Addr::unchecked("raise_1"),
+                capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
+                redemptions: HashSet::new(),
+                distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
+            })
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("raise_1", &vec![]),
+            HandleMsg::IssueCapitalCall {
+                capital_call: CapitalCallIssuance {
+                    amount: 10_001,
+                    days_of_notice: None,
+                },
+            },
+        );
+        assert_eq!(true, res.is_err());
     }
 
     #[test]
