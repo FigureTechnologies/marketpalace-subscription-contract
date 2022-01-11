@@ -4,6 +4,7 @@
   "type": "object",
   "required": [
     "capital_denom",
+    "capital_per_share",
     "lp",
     "max_commitment",
     "min_commitment",
@@ -12,6 +13,11 @@
   "properties": {
     "capital_denom": {
       "type": "string"
+    },
+    "capital_per_share": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
     },
     "lp": {
       "$ref": "#/definitions/Addr"

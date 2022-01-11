@@ -10,6 +10,7 @@ pub struct InstantiateMsg {
     pub recovery_admin: Addr,
     pub lp: Addr,
     pub capital_denom: String,
+    pub capital_per_share: u64,
     pub min_commitment: u64,
     pub max_commitment: u64,
     pub min_days_of_notice: Option<u16>,
