@@ -138,11 +138,11 @@ pub fn try_accept(
         None => return contract_error("commitment required"),
     };
 
-    if commitment.amount.u128() < state.min_commitment.into() {
+    if commitment.amount.u128() < state.capital_to_shares(state.min_commitment).into() {
         return contract_error("commitment less than minimum commitment");
     }
 
-    if commitment.amount.u128() > state.max_commitment.into() {
+    if commitment.amount.u128() > state.capital_to_shares(state.max_commitment).into() {
         return contract_error("commitment more than maximum commitment");
     }
 
@@ -178,7 +178,11 @@ pub fn try_issue_capital_call(
         )
         .unwrap();
 
-    if capital_call.amount > commitment.amount.u128() as u64 {
+    if state.not_evenly_divisble(capital_call.amount) {
+        return contract_error("capital call amount must be evenly divisible by capital per share");
+    }
+
+    if state.capital_to_shares(capital_call.amount) > commitment.amount.u128() as u64 {
         return contract_error("capital call larger than remaining commitment");
     }
 
@@ -652,7 +656,7 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &coins(20_000, "investment_raise")),
+            mock_info("raise_1", &coins(200, "investment_raise")),
             HandleMsg::Accept {},
         )
         .unwrap();
@@ -670,7 +674,7 @@ mod tests {
 
         deps.querier.base.update_balance(
             Addr::unchecked("cosmos2contract"),
-            coins(10_000, "raise_1.commitment"),
+            coins(100, "raise_1.commitment"),
         );
 
         config(&mut deps.storage)
@@ -715,7 +719,7 @@ mod tests {
 
         deps.querier.base.update_balance(
             Addr::unchecked("cosmos2contract"),
-            coins(10_000, "raise_1.commitment"),
+            coins(100, "raise_1.commitment"),
         );
 
         config(&mut deps.storage)
