@@ -502,6 +502,30 @@ mod tests {
     }
 
     #[test]
+    fn issue_capital_call_bad_actor() {
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
+        deps.querier.base.update_balance(
+            Addr::unchecked("cosmos2contract"),
+            coins(100, "raise_1.commitment"),
+        );
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::IssueCapitalCall {
+                capital_call: CapitalCallIssuance {
+                    amount: 10_000,
+                    days_of_notice: None,
+                },
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
     fn issue_capital_call_with_bad_amount() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
@@ -561,6 +585,30 @@ mod tests {
     }
 
     #[test]
+    fn close_capital_call_bad_actor() {
+        let mut deps = mock_dependencies(&coins(100_000, "stable_coin"));
+
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        state.active_capital_call = Some(CapitalCall {
+            sequence: 1,
+            amount: 100_000,
+            days_of_notice: None,
+        });
+        config(&mut deps.storage).save(&state).unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &coins(1_000, "investment")),
+            HandleMsg::CloseCapitalCall {
+                is_retroactive: false,
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
     fn issue_redemption() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
@@ -587,6 +635,26 @@ mod tests {
     }
 
     #[test]
+    fn issue_redemption_bad_actor() {
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
+        load_markers(&mut deps.querier);
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &coins(2_500, "stable_coin")),
+            HandleMsg::IssueRedemption {
+                redemption: 5_000,
+                payment: 2_500,
+                is_retroactive: false,
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
     fn issue_distribution() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
@@ -603,6 +671,24 @@ mod tests {
         )
         .unwrap();
         assert_eq!(0, res.messages.len());
+    }
+
+    #[test]
+    fn issue_distribution_bad_actor() {
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &coins(5_000, "stable_coin")),
+            HandleMsg::IssueDistribution {
+                payment: 5_000,
+                is_retroactive: false,
+            },
+        );
+        assert!(res.is_err());
     }
 
     #[test]
@@ -626,5 +712,22 @@ mod tests {
         let (to_address, coins) = send_msg(msg_at_index(&res, 0));
         assert_eq!("lp_side_account", to_address);
         assert_eq!(10_000, coins.first().unwrap().amount.u128());
+    }
+
+    #[test]
+    fn withdraw_bad_actor() {
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+            },
+        );
+        assert!(res.is_err());
     }
 }
