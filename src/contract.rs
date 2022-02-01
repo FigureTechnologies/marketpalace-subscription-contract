@@ -683,7 +683,12 @@ mod tests {
             },
         )
         .unwrap();
+
+        // verify send message sent
         assert_eq!(1, res.messages.len());
+        let (to_address, coins) = send_msg(msg_at_index(&res, 0));
+        assert_eq!("raise_1", to_address);
+        assert_eq!(5_000, coins.first().unwrap().amount.u128());
     }
 
     #[test]
@@ -728,8 +733,8 @@ mod tests {
 
         // verify send message sent
         assert_eq!(1, res.messages.len());
-        let (to_address, coin) = send_msg(msg_at_index(&res, 0));
+        let (to_address, coins) = send_msg(msg_at_index(&res, 0));
         assert_eq!("lp_side_account", to_address);
-        assert_eq!(10_000, coin.first().unwrap().amount.u128());
+        assert_eq!(10_000, coins.first().unwrap().amount.u128());
     }
 }
