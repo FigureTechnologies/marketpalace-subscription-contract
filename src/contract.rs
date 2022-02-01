@@ -1,8 +1,11 @@
+use crate::version::CONTRACT_NAME;
+use crate::version::CONTRACT_VERSION;
 use cosmwasm_std::coin;
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
     Response, StdError, StdResult,
 };
+use cw2::set_contract_version;
 use provwasm_std::ProvenanceMsg;
 use std::collections::HashSet;
 
@@ -27,6 +30,8 @@ pub fn instantiate(
     info: MessageInfo,
     msg: InstantiateMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
+    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
     let state = State {
         raise: info.sender,
         status: Status::Draft,
