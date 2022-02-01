@@ -1,3 +1,4 @@
+use cosmwasm_std::coin;
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
     Response, StdError, StdResult,
@@ -238,28 +239,25 @@ pub fn try_close_capital_call(
         Ok(state)
     })?;
 
-    let send_capital = BankMsg::Send {
+    let commitment_coin = coin(
+        state.capital_to_shares(capital_call.amount) as u128,
+        format!("{}.commitment", state.raise),
+    );
+    let capital_coin = coin(capital_call.amount as u128, state.capital_denom.clone());
+
+    let send = BankMsg::Send {
         to_address: state.raise.to_string(),
-        amount: coins(capital_call.amount as u128, state.capital_denom.clone()),
-    };
-    let send_commitment = BankMsg::Send {
-        to_address: state.raise.to_string(),
-        amount: coins(
-            state.capital_to_shares(capital_call.amount) as u128,
-            format!("{}.commitment", state.raise),
-        ),
+        amount: if is_retroactive {
+            vec![commitment_coin]
+        } else {
+            vec![capital_coin, commitment_coin]
+        },
     };
 
-    Ok(Response::new()
-        .add_messages(if is_retroactive {
-            vec![send_commitment]
-        } else {
-            vec![send_capital, send_commitment]
-        })
-        .add_attribute(
-            format!("{}.capital_call.sequence", env.contract.address),
-            format!("{}", state.sequence),
-        ))
+    Ok(Response::new().add_message(send).add_attribute(
+        format!("{}.capital_call.sequence", env.contract.address),
+        format!("{}", state.sequence),
+    ))
 }
 
 pub fn try_issue_redemption(
@@ -659,7 +657,17 @@ mod tests {
             },
         )
         .unwrap();
-        assert_eq!(2, res.messages.len());
+
+        // verify commitment and capital sent to raise
+        assert_eq!(1, res.messages.len());
+        let (to_address, coins) = send_msg(msg_at_index(&res, 0));
+        assert_eq!("raise_1", to_address);
+        let capital_coin = coins.get(0).unwrap();
+        assert_eq!(100_000, capital_coin.amount.u128());
+        assert_eq!("stable_coin", capital_coin.denom);
+        let commitment_coin = coins.get(1).unwrap();
+        assert_eq!(1_000, commitment_coin.amount.u128());
+        assert_eq!("raise_1.commitment", commitment_coin.denom);
     }
 
     #[test]
