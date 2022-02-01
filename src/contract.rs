@@ -436,6 +436,8 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::msg_at_index;
+    use crate::mock::send_msg;
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Addr};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
@@ -723,6 +725,11 @@ mod tests {
             },
         )
         .unwrap();
+
+        // verify send message sent
         assert_eq!(1, res.messages.len());
+        let (to_address, coin) = send_msg(msg_at_index(&res, 0));
+        assert_eq!("lp_side_account", to_address);
+        assert_eq!(10_000, coin.first().unwrap().amount.u128());
     }
 }
