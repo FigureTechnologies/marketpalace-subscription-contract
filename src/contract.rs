@@ -392,7 +392,10 @@ mod tests {
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
     use crate::state::State;
+    use cosmwasm_std::testing::MockApi;
+    use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::OwnedDeps;
     use cosmwasm_std::{coins, from_binary, Addr};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
     use provwasm_std::Marker;
@@ -403,16 +406,24 @@ mod tests {
         querier.with_markers(vec![expected_marker.clone()]);
     }
 
-    #[test]
-    fn recover() {
+    pub fn default_deps(
+        update_state: Option<fn(&mut State)>,
+    ) -> OwnedDeps<MockStorage, MockApi, ProvenanceMockQuerier> {
         let mut deps = mock_dependencies(&[]);
 
-        config(&mut deps.storage)
-            .save(&State::test_default())
-            .unwrap();
+        let mut state = State::test_default();
+        if let Some(update) = update_state {
+            update(&mut state);
+        }
+        config(&mut deps.storage).save(&state).unwrap();
 
+        deps
+    }
+
+    #[test]
+    fn recover() {
         execute(
-            deps.as_mut(),
+            default_deps(None).as_mut(),
             mock_env(),
             mock_info("admin", &vec![]),
             HandleMsg::Recover {
@@ -424,14 +435,8 @@ mod tests {
 
     #[test]
     fn bad_actor_recover_fail() {
-        let mut deps = mock_dependencies(&[]);
-
-        config(&mut deps.storage)
-            .save(&State::test_default())
-            .unwrap();
-
         let res = execute(
-            deps.as_mut(),
+            default_deps(None).as_mut(),
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::Recover {
@@ -443,11 +448,7 @@ mod tests {
 
     #[test]
     fn accept() {
-        let mut deps = mock_dependencies(&[]);
-
-        config(&mut deps.storage)
-            .save(&State::test_default())
-            .unwrap();
+        let mut deps = default_deps(None);
 
         let res = execute(
             deps.as_mut(),
@@ -465,17 +466,25 @@ mod tests {
     }
 
     #[test]
-    fn issue_capital_call() {
-        let mut deps = mock_dependencies(&vec![]);
+    fn accept_bad_actor() {
+        let res = execute(
+            default_deps(None).as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &coins(200, "investment_raise")),
+            HandleMsg::Accept {},
+        );
+        assert!(res.is_err());
+    }
 
+    #[test]
+    fn issue_capital_call() {
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
         deps.querier.base.update_balance(
             Addr::unchecked("cosmos2contract"),
             coins(100, "raise_1.commitment"),
         );
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -494,16 +503,13 @@ mod tests {
 
     #[test]
     fn issue_capital_call_with_bad_amount() {
-        let mut deps = mock_dependencies(&vec![]);
-
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
         deps.querier.base.update_balance(
             Addr::unchecked("cosmos2contract"),
             coins(100, "raise_1.commitment"),
         );
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -556,13 +562,10 @@ mod tests {
 
     #[test]
     fn issue_redemption() {
-        let mut deps = mock_dependencies(&[]);
-
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
         load_markers(&mut deps.querier);
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -585,11 +588,9 @@ mod tests {
 
     #[test]
     fn issue_distribution() {
-        let mut deps = mock_dependencies(&[]);
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        config(&mut deps.storage).save(&state).unwrap();
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
 
         let res = execute(
             deps.as_mut(),
@@ -606,12 +607,9 @@ mod tests {
 
     #[test]
     fn withdraw() {
-        let mut deps = mock_dependencies(&[]);
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        config(&mut deps.storage).save(&state).unwrap();
-
+        let mut deps = default_deps(Some(|state| {
+            state.status = Status::Accepted;
+        }));
         let res = execute(
             deps.as_mut(),
             mock_env(),
