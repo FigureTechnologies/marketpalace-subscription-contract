@@ -28,6 +28,16 @@ pub struct State {
     pub withdrawals: HashSet<Withdrawal>,
 }
 
+impl State {
+    pub fn not_evenly_divisble(&self, amount: u64) -> bool {
+        amount % self.capital_per_share > 0
+    }
+
+    pub fn capital_to_shares(&self, amount: u64) -> u64 {
+        amount / self.capital_per_share
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub enum Status {
     Draft,
@@ -127,4 +137,42 @@ pub fn config(storage: &mut dyn Storage) -> Singleton<State> {
 
 pub fn config_read(storage: &dyn Storage) -> ReadonlySingleton<State> {
     singleton_read(storage, CONFIG_KEY)
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    impl State {
+        pub fn test_default() -> State {
+            State {
+                recovery_admin: Addr::unchecked("admin"),
+                lp: Addr::unchecked("lp"),
+                status: Status::Draft,
+                raise: Addr::unchecked("raise_1"),
+                capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
+                min_commitment: 10_000,
+                max_commitment: 100_000,
+                min_days_of_notice: Some(10),
+                sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
+                redemptions: HashSet::new(),
+                distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
+            }
+        }
+    }
+
+    #[test]
+    fn not_evenly_divisble() {
+        let state = State::test_default();
+
+        assert_eq!(false, state.not_evenly_divisble(100));
+        assert_eq!(true, state.not_evenly_divisble(101));
+        assert_eq!(false, state.not_evenly_divisble(1_000));
+        assert_eq!(true, state.not_evenly_divisble(1_001));
+    }
 }

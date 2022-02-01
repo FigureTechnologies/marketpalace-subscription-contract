@@ -58,16 +58,6 @@ pub fn instantiate(
     Ok(Response::default())
 }
 
-impl State {
-    fn not_evenly_divisble(&self, amount: u64) -> bool {
-        amount % self.capital_per_share > 0
-    }
-
-    fn capital_to_shares(&self, amount: u64) -> u64 {
-        amount / self.capital_per_share
-    }
-}
-
 // And declare a custom Error variant for the ones where you will want to make use of it
 #[entry_point]
 pub fn execute(
@@ -458,33 +448,6 @@ mod tests {
     }
 
     #[test]
-    fn not_evenly_divisble() {
-        let state = State {
-            recovery_admin: Addr::unchecked("admin"),
-            lp: Addr::unchecked("lp"),
-            status: Status::Draft,
-            raise: Addr::unchecked("raise_1"),
-            capital_denom: String::from("stable_coin"),
-            capital_per_share: 100,
-            min_commitment: 10_000,
-            max_commitment: 100_000,
-            min_days_of_notice: Some(10),
-            sequence: 0,
-            active_capital_call: None,
-            closed_capital_calls: HashSet::new(),
-            cancelled_capital_calls: HashSet::new(),
-            redemptions: HashSet::new(),
-            distributions: HashSet::new(),
-            withdrawals: HashSet::new(),
-        };
-
-        assert_eq!(false, state.not_evenly_divisble(100));
-        assert_eq!(true, state.not_evenly_divisble(101));
-        assert_eq!(false, state.not_evenly_divisble(1_000));
-        assert_eq!(true, state.not_evenly_divisble(1_001));
-    }
-
-    #[test]
     fn initialization() {
         let mut deps = mock_dependencies(&[]);
 
@@ -561,24 +524,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Draft,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
+            .save(&State::test_default())
             .unwrap();
 
         execute(
@@ -597,24 +543,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Draft,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
+            .save(&State::test_default())
             .unwrap();
 
         let res = execute(
@@ -633,24 +562,7 @@ mod tests {
         let mut deps = mock_dependencies(&[]);
 
         config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Draft,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
+            .save(&State::test_default())
             .unwrap();
 
         let res = execute(
@@ -677,26 +589,9 @@ mod tests {
             coins(100, "raise_1.commitment"),
         );
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -722,26 +617,9 @@ mod tests {
             coins(100, "raise_1.commitment"),
         );
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -761,30 +639,14 @@ mod tests {
     fn close_capital_call() {
         let mut deps = mock_dependencies(&coins(100_000, "stable_coin"));
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: Some(CapitalCall {
-                    sequence: 1,
-                    amount: 100_000,
-                    days_of_notice: None,
-                }),
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        state.active_capital_call = Some(CapitalCall {
+            sequence: 1,
+            amount: 100_000,
+            days_of_notice: None,
+        });
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -804,26 +666,9 @@ mod tests {
 
         load_markers(&mut deps.querier);
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -843,26 +688,9 @@ mod tests {
     fn issue_distribution() {
         let mut deps = mock_dependencies(&[]);
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
@@ -881,26 +709,9 @@ mod tests {
     fn withdraw() {
         let mut deps = mock_dependencies(&[]);
 
-        config(&mut deps.storage)
-            .save(&State {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                status: Status::Accepted,
-                raise: Addr::unchecked("raise_1"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
-            })
-            .unwrap();
+        let mut state = State::test_default();
+        state.status = Status::Accepted;
+        config(&mut deps.storage).save(&state).unwrap();
 
         let res = execute(
             deps.as_mut(),
