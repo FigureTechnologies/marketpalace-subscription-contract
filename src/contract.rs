@@ -1,68 +1,18 @@
-use crate::version::CONTRACT_NAME;
-use crate::version::CONTRACT_VERSION;
+use crate::error::contract_error;
 use cosmwasm_std::coin;
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
-    Response, StdError, StdResult,
+    Response, StdResult,
 };
-use cw2::set_contract_version;
 use provwasm_std::ProvenanceMsg;
-use std::collections::HashSet;
 
 use crate::error::ContractError;
-use crate::msg::{
-    CapitalCallIssuance, CapitalCalls, HandleMsg, InstantiateMsg, QueryMsg, Terms, Transactions,
-};
+use crate::msg::{CapitalCallIssuance, CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
 use crate::state::{
-    config, config_read, CapitalCall, Distribution, Redemption, State, Status, Withdrawal,
+    config, config_read, CapitalCall, Distribution, Redemption, Status, Withdrawal,
 };
 
-fn contract_error<T>(err: &str) -> Result<T, ContractError> {
-    Err(ContractError::Std(StdError::generic_err(err)))
-}
-
-// Note, you can use StdResult in some functions where you do not
-// make use of the custom errors
-#[entry_point]
-pub fn instantiate(
-    deps: DepsMut,
-    _env: Env,
-    info: MessageInfo,
-    msg: InstantiateMsg,
-) -> Result<Response<ProvenanceMsg>, ContractError> {
-    set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-
-    let state = State {
-        raise: info.sender,
-        status: Status::Draft,
-        recovery_admin: msg.recovery_admin,
-        lp: msg.lp.clone(),
-        capital_denom: msg.capital_denom,
-        capital_per_share: msg.capital_per_share,
-        min_commitment: msg.min_commitment,
-        max_commitment: msg.max_commitment,
-        min_days_of_notice: msg.min_days_of_notice,
-        sequence: 0,
-        active_capital_call: None,
-        closed_capital_calls: HashSet::new(),
-        cancelled_capital_calls: HashSet::new(),
-        redemptions: HashSet::new(),
-        distributions: HashSet::new(),
-        withdrawals: HashSet::new(),
-    };
-
-    if state.not_evenly_divisble(msg.min_commitment) {
-        return contract_error("min commitment must be evenly divisible by capital per share");
-    }
-
-    if state.not_evenly_divisble(msg.max_commitment) {
-        return contract_error("max commitment must be evenly divisible by capital per share");
-    }
-
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::default())
-}
+pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 
 // And declare a custom Error variant for the ones where you will want to make use of it
 #[entry_point]
@@ -441,6 +391,7 @@ mod tests {
     use super::*;
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
+    use crate::state::State;
     use cosmwasm_std::testing::{mock_env, mock_info};
     use cosmwasm_std::{coins, from_binary, Addr};
     use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
@@ -450,78 +401,6 @@ mod tests {
         let bin = must_read_binary_file("testdata/marker.json");
         let expected_marker: Marker = from_binary(&bin).unwrap();
         querier.with_markers(vec![expected_marker.clone()]);
-    }
-
-    #[test]
-    fn initialization() {
-        let mut deps = mock_dependencies(&[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("lp", &[]),
-            InstantiateMsg {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 50_000,
-                min_days_of_notice: None,
-            },
-        )
-        .unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
-        let terms: Terms = from_binary(&res).unwrap();
-        assert_eq!("lp", terms.lp);
-    }
-
-    #[test]
-    fn init_with_bad_min() {
-        let mut deps = mock_dependencies(&[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("lp", &[]),
-            InstantiateMsg {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_001,
-                max_commitment: 50_000,
-                min_days_of_notice: None,
-            },
-        );
-        assert_eq!(true, res.is_err());
-    }
-
-    #[test]
-    fn init_with_bad_max() {
-        let mut deps = mock_dependencies(&[]);
-
-        // we can just call .unwrap() to assert this was a success
-        let res = instantiate(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("lp", &[]),
-            InstantiateMsg {
-                recovery_admin: Addr::unchecked("admin"),
-                lp: Addr::unchecked("lp"),
-                capital_denom: String::from("stable_coin"),
-                capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 50_001,
-                min_days_of_notice: None,
-            },
-        );
-        assert_eq!(true, res.is_err());
     }
 
     #[test]
