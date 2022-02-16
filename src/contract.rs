@@ -5,6 +5,7 @@ use cosmwasm_std::{
     Response, StdResult,
 };
 use provwasm_std::ProvenanceMsg;
+use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
 use crate::msg::{CapitalCallIssuance, CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
@@ -17,7 +18,7 @@ pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 // And declare a custom Error variant for the ones where you will want to make use of it
 #[entry_point]
 pub fn execute(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     msg: HandleMsg,
@@ -47,7 +48,7 @@ pub fn execute(
 }
 
 pub fn try_recover(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     info: MessageInfo,
     lp: Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
@@ -66,7 +67,7 @@ pub fn try_recover(
 }
 
 pub fn try_accept(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
@@ -101,7 +102,7 @@ pub fn try_accept(
 }
 
 pub fn try_issue_capital_call(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     capital_call: CapitalCallIssuance,
@@ -158,7 +159,7 @@ pub fn try_issue_capital_call(
 }
 
 pub fn try_close_capital_call(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     is_retroactive: bool,
@@ -216,7 +217,7 @@ pub fn try_close_capital_call(
 }
 
 pub fn try_issue_redemption(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     redemption: u64,
@@ -272,7 +273,7 @@ pub fn try_issue_redemption(
 }
 
 pub fn try_issue_distribution(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     payment: u64,
@@ -321,7 +322,7 @@ pub fn try_issue_distribution(
 }
 
 pub fn try_issue_withdrawal(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
     to: Addr,
@@ -361,7 +362,7 @@ pub fn try_issue_withdrawal(
 }
 
 #[entry_point]
-pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     let state = config_read(deps.storage).load()?;
 
     match msg {
@@ -408,7 +409,7 @@ mod tests {
 
     pub fn default_deps(
         update_state: Option<fn(&mut State)>,
-    ) -> OwnedDeps<MockStorage, MockApi, ProvenanceMockQuerier> {
+    ) -> OwnedDeps<MockStorage, MockApi, ProvenanceMockQuerier, ProvenanceQuery> {
         let mut deps = mock_dependencies(&[]);
 
         let mut state = State::test_default();

@@ -12,11 +12,12 @@ use cosmwasm_std::Env;
 use cosmwasm_std::MessageInfo;
 use cosmwasm_std::Response;
 use cw2::set_contract_version;
+use provwasm_std::ProvenanceQuery;
 use std::collections::HashSet;
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
