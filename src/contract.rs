@@ -33,11 +33,9 @@ pub fn execute(
         HandleMsg::CloseCapitalCall { is_retroactive } => {
             try_close_capital_call(deps, env, info, is_retroactive)
         }
-        HandleMsg::IssueRedemption {
-            redemption,
-            payment,
-            is_retroactive,
-        } => try_issue_redemption(deps, env, info, redemption, payment, is_retroactive),
+        HandleMsg::ClaimRedemption { asset, capital } => {
+            try_claim_redemption(deps, env, info, asset, capital)
+        }
         HandleMsg::ClaimDistribution { amount } => try_claim_distribution(deps, env, info, amount),
         HandleMsg::IssueWithdrawal { to, amount } => {
             try_issue_withdrawal(deps, env, info, to, amount)
@@ -214,13 +212,12 @@ pub fn try_close_capital_call(
     ))
 }
 
-pub fn try_issue_redemption(
+pub fn try_claim_redemption(
     deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
-    redemption: u64,
-    payment: u64,
-    is_retroactive: bool,
+    asset: u64,
+    capital: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -228,46 +225,35 @@ pub fn try_issue_redemption(
         return contract_error("subscription is not accepted");
     }
 
-    if info.sender != state.raise {
-        return contract_error("only the raise contract can issue redemption");
-    }
-
-    if !is_retroactive {
-        let sent = match info.funds.first() {
-            Some(sent) => sent,
-            None => return contract_error("payment required for redemption"),
-        };
-
-        if sent.denom != state.capital_denom {
-            return contract_error("payment should be made in capital denom");
-        }
-
-        if sent.amount.u128() != payment.into() {
-            return contract_error("sent funds should match specified payment");
-        }
+    if info.sender != state.lp {
+        return contract_error("only the lp can claim a redemption");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.sequence += 1;
         state.redemptions.insert(Redemption {
             sequence: state.sequence,
-            asset: redemption,
-            capital: payment,
+            asset,
+            capital,
         });
         Ok(state)
     })?;
 
-    let send = BankMsg::Send {
-        to_address: state.raise.to_string(),
-        amount: coins(redemption as u128, format!("{}.investment", state.raise)),
-    };
-
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response::new().add_message(send).add_attribute(
-        format!("{}.redemption.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
+    Ok(Response::new()
+        .add_attribute(
+            format!("{}.redemptions.sequence", env.contract.address),
+            format!("{}", state.sequence),
+        )
+        .add_message(
+            wasm_execute(
+                state.raise.clone(),
+                &RaiseExecuteMsg::ClaimRedemption { asset, capital },
+                coins(asset as u128, format!("{}.investment", state.raise)),
+            )
+            .unwrap(),
+        ))
 }
 
 pub fn try_claim_distribution(
@@ -602,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    fn issue_redemption() {
+    fn claim_redemption() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
         }));
@@ -611,24 +597,30 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &coins(2_500, "stable_coin")),
-            HandleMsg::IssueRedemption {
-                redemption: 5_000,
-                payment: 2_500,
-                is_retroactive: false,
+            mock_info("lp", &vec![]),
+            HandleMsg::ClaimRedemption {
+                asset: 5_000,
+                capital: 2_500,
             },
         )
         .unwrap();
 
-        // verify send message sent
+        // verify exec message sent
         assert_eq!(1, res.messages.len());
-        let (to_address, coins) = send_msg(msg_at_index(&res, 0));
-        assert_eq!("raise_1", to_address);
-        assert_eq!(5_000, coins.first().unwrap().amount.u128());
+        let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert!(match msg {
+            RaiseExecuteMsg::ClaimRedemption {
+                asset: _,
+                capital: _,
+            } => true,
+            _ => false,
+        });
+        assert_eq!(5_000, funds.first().unwrap().amount.u128());
     }
 
     #[test]
-    fn issue_redemption_bad_actor() {
+    fn claim_redemption_bad_actor() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
         }));
@@ -637,13 +629,13 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("bad_actor", &coins(2_500, "stable_coin")),
-            HandleMsg::IssueRedemption {
-                redemption: 5_000,
-                payment: 2_500,
-                is_retroactive: false,
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::ClaimRedemption {
+                asset: 5_000,
+                capital: 2_500,
             },
         );
+
         assert!(res.is_err());
     }
 

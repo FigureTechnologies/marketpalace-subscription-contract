@@ -77,26 +77,22 @@
     {
       "type": "object",
       "required": [
-        "issue_redemption"
+        "claim_redemption"
       ],
       "properties": {
-        "issue_redemption": {
+        "claim_redemption": {
           "type": "object",
           "required": [
-            "is_retroactive",
-            "payment",
-            "redemption"
+            "asset",
+            "capital"
           ],
           "properties": {
-            "is_retroactive": {
-              "type": "boolean"
-            },
-            "payment": {
+            "asset": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
             },
-            "redemption": {
+            "capital": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
