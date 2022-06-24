@@ -611,8 +611,8 @@ mod tests {
         assert_eq!("raise_1", contract_addr);
         assert!(match msg {
             RaiseExecuteMsg::ClaimRedemption {
-                asset: _,
-                capital: _,
+                asset: 5000,
+                capital: 2_500,
             } => true,
             _ => false,
         });
@@ -658,7 +658,7 @@ mod tests {
         let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
         assert!(match msg {
-            RaiseExecuteMsg::ClaimDistribution { amount: _ } => true,
+            RaiseExecuteMsg::ClaimDistribution { amount: 5_000 } => true,
             _ => false,
         });
     }
