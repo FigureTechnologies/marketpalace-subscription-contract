@@ -609,13 +609,13 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
-        assert!(match msg {
+        assert_eq!(
             RaiseExecuteMsg::ClaimRedemption {
                 asset: 5000,
                 capital: 2_500,
-            } => true,
-            _ => false,
-        });
+            },
+            msg
+        );
         assert_eq!(5_000, funds.first().unwrap().amount.u128());
     }
 
@@ -657,10 +657,7 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
-        assert!(match msg {
-            RaiseExecuteMsg::ClaimDistribution { amount: 5_000 } => true,
-            _ => false,
-        });
+        assert_eq!(RaiseExecuteMsg::ClaimDistribution { amount: 5_000 }, msg);
     }
 
     #[test]
