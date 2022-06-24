@@ -33,10 +33,15 @@ pub fn execute(
         HandleMsg::CloseCapitalCall { is_retroactive } => {
             try_close_capital_call(deps, env, info, is_retroactive)
         }
-        HandleMsg::ClaimRedemption { asset, capital } => {
-            try_claim_redemption(deps, env, info, asset, capital)
+        HandleMsg::ClaimRedemption {
+            asset,
+            capital,
+            to,
+            memo,
+        } => try_claim_redemption(deps, env, info, asset, capital, to, memo),
+        HandleMsg::ClaimDistribution { amount, to, memo } => {
+            try_claim_distribution(deps, env, info, amount, to, memo)
         }
-        HandleMsg::ClaimDistribution { amount } => try_claim_distribution(deps, env, info, amount),
         HandleMsg::IssueWithdrawal { to, amount } => {
             try_issue_withdrawal(deps, env, info, to, amount)
         }
@@ -218,6 +223,8 @@ pub fn try_claim_redemption(
     info: MessageInfo,
     asset: u64,
     capital: u64,
+    to: Option<Addr>,
+    memo: Option<String>,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
 
@@ -245,7 +252,12 @@ pub fn try_claim_redemption(
         .add_message(
             wasm_execute(
                 state.raise.clone(),
-                &RaiseExecuteMsg::ClaimRedemption { asset, capital },
+                &RaiseExecuteMsg::ClaimRedemption {
+                    asset,
+                    capital,
+                    to: to.unwrap_or(env.contract.address),
+                    memo,
+                },
                 coins(asset as u128, format!("{}.investment", state.raise)),
             )
             .unwrap(),
@@ -257,6 +269,8 @@ pub fn try_claim_distribution(
     env: Env,
     info: MessageInfo,
     amount: u64,
+    to: Option<Addr>,
+    memo: Option<String>,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
 
@@ -283,7 +297,11 @@ pub fn try_claim_distribution(
         .add_message(
             wasm_execute(
                 state.raise,
-                &RaiseExecuteMsg::ClaimDistribution { amount },
+                &RaiseExecuteMsg::ClaimDistribution {
+                    amount,
+                    to: to.unwrap_or(env.contract.address),
+                    memo,
+                },
                 vec![],
             )
             .unwrap(),
@@ -593,6 +611,8 @@ mod tests {
             HandleMsg::ClaimRedemption {
                 asset: 5_000,
                 capital: 2_500,
+                to: None,
+                memo: None,
             },
         )
         .unwrap();
@@ -605,6 +625,8 @@ mod tests {
             RaiseExecuteMsg::ClaimRedemption {
                 asset: 5000,
                 capital: 2_500,
+                to: Addr::unchecked("cosmos2contract"),
+                memo: None,
             },
             msg
         );
@@ -631,6 +653,8 @@ mod tests {
             HandleMsg::ClaimRedemption {
                 asset: 5_000,
                 capital: 2_500,
+                to: None,
+                memo: None,
             },
         );
 
@@ -647,7 +671,11 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("lp", &coins(5_000, "stable_coin")),
-            HandleMsg::ClaimDistribution { amount: 5_000 },
+            HandleMsg::ClaimDistribution {
+                amount: 5_000,
+                to: None,
+                memo: None,
+            },
         )
         .unwrap();
 
@@ -655,7 +683,14 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
-        assert_eq!(RaiseExecuteMsg::ClaimDistribution { amount: 5_000 }, msg);
+        assert_eq!(
+            RaiseExecuteMsg::ClaimDistribution {
+                amount: 5_000,
+                to: Addr::unchecked("cosmos2contract"),
+                memo: None
+            },
+            msg
+        );
 
         // verify attributes
         assert_eq!(1, res.attributes.len());
@@ -674,7 +709,11 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("bad_actor", &coins(5_000, "stable_coin")),
-            HandleMsg::ClaimDistribution { amount: 5_000 },
+            HandleMsg::ClaimDistribution {
+                amount: 5_000,
+                to: None,
+                memo: None,
+            },
         );
 
         assert!(res.is_err());

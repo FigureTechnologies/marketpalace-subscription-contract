@@ -96,6 +96,22 @@
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }
@@ -118,6 +134,22 @@
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
           }
         }

@@ -23,13 +23,31 @@ pub struct MigrateMsg {}
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum HandleMsg {
-    Recover { lp: Addr },
+    Recover {
+        lp: Addr,
+    },
     Accept {},
-    IssueCapitalCall { capital_call: CapitalCallIssuance },
-    CloseCapitalCall { is_retroactive: bool },
-    ClaimRedemption { asset: u64, capital: u64 },
-    ClaimDistribution { amount: u64 },
-    IssueWithdrawal { to: Addr, amount: u64 },
+    IssueCapitalCall {
+        capital_call: CapitalCallIssuance,
+    },
+    CloseCapitalCall {
+        is_retroactive: bool,
+    },
+    ClaimRedemption {
+        asset: u64,
+        capital: u64,
+        to: Option<Addr>,
+        memo: Option<String>,
+    },
+    ClaimDistribution {
+        amount: u64,
+        to: Option<Addr>,
+        memo: Option<String>,
+    },
+    IssueWithdrawal {
+        to: Addr,
+        amount: u64,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
