@@ -4,5 +4,6 @@ pub mod instantiate;
 pub mod migrate;
 pub mod mock;
 pub mod msg;
+pub mod raise_msg;
 pub mod state;
 pub mod version;

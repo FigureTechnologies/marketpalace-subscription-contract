@@ -109,20 +109,16 @@
     {
       "type": "object",
       "required": [
-        "issue_distribution"
+        "claim_distribution"
       ],
       "properties": {
-        "issue_distribution": {
+        "claim_distribution": {
           "type": "object",
           "required": [
-            "is_retroactive",
-            "payment"
+            "amount"
           ],
           "properties": {
-            "is_retroactive": {
-              "type": "boolean"
-            },
-            "payment": {
+            "amount": {
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0

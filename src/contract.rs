@@ -1,5 +1,6 @@
 use crate::error::contract_error;
-use cosmwasm_std::coin;
+use crate::raise_msg::RaiseExecuteMsg;
+use cosmwasm_std::{coin, wasm_execute};
 use cosmwasm_std::{
     coins, entry_point, to_binary, Addr, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo,
     Response, StdResult,
@@ -37,10 +38,7 @@ pub fn execute(
             payment,
             is_retroactive,
         } => try_issue_redemption(deps, env, info, redemption, payment, is_retroactive),
-        HandleMsg::IssueDistribution {
-            payment,
-            is_retroactive,
-        } => try_issue_distribution(deps, env, info, payment, is_retroactive),
+        HandleMsg::ClaimDistribution { amount } => try_claim_distribution(deps, env, info, amount),
         HandleMsg::IssueWithdrawal { to, amount } => {
             try_issue_withdrawal(deps, env, info, to, amount)
         }
@@ -272,12 +270,11 @@ pub fn try_issue_redemption(
     ))
 }
 
-pub fn try_issue_distribution(
+pub fn try_claim_distribution(
     deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
-    payment: u64,
-    is_retroactive: bool,
+    amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let state = config_read(deps.storage).load()?;
 
@@ -285,40 +282,34 @@ pub fn try_issue_distribution(
         return contract_error("subscription has not been accepted");
     }
 
-    if info.sender != state.raise {
-        return contract_error("only the raise contract can issue redemption");
-    }
-
-    if !is_retroactive {
-        let sent = match info.funds.first() {
-            Some(sent) => sent,
-            None => return contract_error("payment required for distribution"),
-        };
-
-        if sent.denom != state.capital_denom {
-            return contract_error("payment should be made in capital denom");
-        }
-
-        if sent.amount.u128() != payment.into() {
-            return contract_error("sent funds should match specified payment");
-        }
+    if info.sender != state.lp {
+        return contract_error("only the lp can claim a distribution");
     }
 
     config(deps.storage).update(|mut state| -> Result<_, ContractError> {
         state.sequence += 1;
         state.distributions.insert(Distribution {
             sequence: state.sequence,
-            amount: payment,
+            amount,
         });
         Ok(state)
     })?;
 
     let state = config_read(deps.storage).load()?;
 
-    Ok(Response::new().add_attribute(
-        format!("{}.distribution.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
+    Ok(Response::new()
+        .add_attribute(
+            format!("{}.distribution.sequence", env.contract.address),
+            format!("{}", state.sequence),
+        )
+        .add_message(
+            wasm_execute(
+                state.raise,
+                &RaiseExecuteMsg::ClaimDistribution { amount },
+                vec![],
+            )
+            .unwrap(),
+        ))
 }
 
 pub fn try_issue_withdrawal(
@@ -390,6 +381,7 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::execute_args;
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
     use crate::state::State;
@@ -656,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    fn issue_distribution() {
+    fn claim_distribution() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
         }));
@@ -664,18 +656,23 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &coins(5_000, "stable_coin")),
-            HandleMsg::IssueDistribution {
-                payment: 5_000,
-                is_retroactive: false,
-            },
+            mock_info("lp", &coins(5_000, "stable_coin")),
+            HandleMsg::ClaimDistribution { amount: 5_000 },
         )
         .unwrap();
-        assert_eq!(0, res.messages.len());
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert!(match msg {
+            RaiseExecuteMsg::ClaimDistribution { amount: _ } => true,
+            _ => false,
+        });
     }
 
     #[test]
-    fn issue_distribution_bad_actor() {
+    fn claim_distribution_bad_actor() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
         }));
@@ -684,11 +681,9 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("bad_actor", &coins(5_000, "stable_coin")),
-            HandleMsg::IssueDistribution {
-                payment: 5_000,
-                is_retroactive: false,
-            },
+            HandleMsg::ClaimDistribution { amount: 5_000 },
         );
+
         assert!(res.is_err());
     }
 

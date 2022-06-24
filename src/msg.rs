@@ -38,9 +38,8 @@ pub enum HandleMsg {
         payment: u64,
         is_retroactive: bool,
     },
-    IssueDistribution {
-        payment: u64,
-        is_retroactive: bool,
+    ClaimDistribution {
+        amount: u64,
     },
     IssueWithdrawal {
         to: Addr,
