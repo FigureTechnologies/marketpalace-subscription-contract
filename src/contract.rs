@@ -237,8 +237,6 @@ pub fn try_claim_redemption(
     });
     config(deps.storage).save(&state)?;
 
-    let state = config_read(deps.storage).load()?;
-
     Ok(Response::new()
         .add_attribute(
             format!("{}.redemption.sequence", env.contract.address),
@@ -260,7 +258,7 @@ pub fn try_claim_distribution(
     info: MessageInfo,
     amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config(deps.storage).load()?;
 
     if state.status != Status::Accepted {
         return contract_error("subscription has not been accepted");
@@ -270,16 +268,12 @@ pub fn try_claim_distribution(
         return contract_error("only the lp can claim a distribution");
     }
 
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.sequence += 1;
-        state.distributions.insert(Distribution {
-            sequence: state.sequence,
-            amount,
-        });
-        Ok(state)
-    })?;
-
-    let state = config_read(deps.storage).load()?;
+    state.sequence += 1;
+    state.distributions.insert(Distribution {
+        sequence: state.sequence,
+        amount,
+    });
+    config(deps.storage).save(&state)?;
 
     Ok(Response::new()
         .add_attribute(
