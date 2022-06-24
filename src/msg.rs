@@ -27,11 +27,8 @@ pub enum HandleMsg {
         lp: Addr,
     },
     Accept {},
-    IssueCapitalCall {
-        capital_call: CapitalCallIssuance,
-    },
-    CloseCapitalCall {
-        is_retroactive: bool,
+    ClaimInvestment {
+        amount: u64,
     },
     ClaimRedemption {
         asset: u64,

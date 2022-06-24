@@ -9,10 +9,8 @@ use provwasm_std::ProvenanceMsg;
 use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
-use crate::msg::{CapitalCallIssuance, CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
-use crate::state::{
-    config, config_read, CapitalCall, Distribution, Redemption, Status, Withdrawal,
-};
+use crate::msg::{CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
+use crate::state::{config, config_read, Distribution, Redemption, Status, Withdrawal};
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 
@@ -27,12 +25,7 @@ pub fn execute(
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
         HandleMsg::Accept {} => try_accept(deps, info),
-        HandleMsg::IssueCapitalCall { capital_call } => {
-            try_issue_capital_call(deps, env, info, capital_call)
-        }
-        HandleMsg::CloseCapitalCall { is_retroactive } => {
-            try_close_capital_call(deps, env, info, is_retroactive)
-        }
+        HandleMsg::ClaimInvestment { amount } => try_claim_investment(deps, env, info, amount),
         HandleMsg::ClaimRedemption {
             asset,
             capital,
@@ -102,119 +95,52 @@ pub fn try_accept(
     Ok(Response::default())
 }
 
-pub fn try_issue_capital_call(
+pub fn try_claim_investment(
     deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
-    capital_call: CapitalCallIssuance,
+    amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config(deps.storage).load()?;
 
     if state.status != Status::Accepted {
         return contract_error("subscription is not accepted");
     }
 
-    if info.sender != state.raise {
-        return contract_error("only the raise contract can issue capital call");
+    if info.sender != state.lp {
+        return contract_error("only the lp can claim investment");
     }
 
-    let commitment = deps
-        .querier
-        .query_balance(
-            env.contract.address.clone(),
-            format!("{}.commitment", state.raise),
-        )
-        .unwrap();
-
-    if state.not_evenly_divisble(capital_call.amount) {
-        return contract_error("capital call amount must be evenly divisible by capital per share");
-    }
-
-    if state.capital_to_shares(capital_call.amount) > commitment.amount.u128() as u64 {
-        return contract_error("capital call larger than remaining commitment");
-    }
-
-    if capital_call.days_of_notice.unwrap_or(u16::MAX) < state.min_days_of_notice.unwrap_or(0) {
-        return contract_error("not enough notice");
-    }
-
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.sequence += 1;
-        let replaced = state.active_capital_call.replace(CapitalCall {
+    state.sequence += 1;
+    state
+        .closed_capital_calls
+        .insert(crate::state::CapitalCall {
             sequence: state.sequence,
-            amount: capital_call.amount,
-            days_of_notice: capital_call.days_of_notice,
+            amount,
+            days_of_notice: None,
         });
-        if let Some(replaced) = replaced {
-            state.cancelled_capital_calls.insert(replaced);
-        }
-        Ok(state)
-    })?;
 
-    let state = config_read(deps.storage).load()?;
+    config(deps.storage).save(&state)?;
 
-    Ok(Response::new().add_attribute(
-        format!("{}.capital_call.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
-}
-
-pub fn try_close_capital_call(
-    deps: DepsMut<ProvenanceQuery>,
-    env: Env,
-    info: MessageInfo,
-    is_retroactive: bool,
-) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
-
-    if state.status != Status::Accepted {
-        return contract_error("subscription is not accepted");
-    }
-
-    if info.sender != state.raise {
-        return contract_error("only the raise contract can close capital call");
-    }
-
-    let capital_call = match state.active_capital_call {
-        Some(ref capital_call) => capital_call,
-        None => return contract_error("no existing capital call issued"),
-    };
-
-    let investment = match info.funds.first() {
-        Some(investment) => investment,
-        None => return contract_error("no investment provided"),
-    };
-
-    if investment.amount.u128() != u128::from(state.capital_to_shares(capital_call.amount)) {
-        return contract_error("incorrect investment provided");
-    }
-
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state
-            .closed_capital_calls
-            .insert(state.active_capital_call.take().unwrap());
-        Ok(state)
-    })?;
-
-    let commitment_coin = coin(
-        state.capital_to_shares(capital_call.amount) as u128,
-        format!("{}.commitment", state.raise),
-    );
-    let capital_coin = coin(capital_call.amount as u128, state.capital_denom.clone());
-
-    let send = BankMsg::Send {
-        to_address: state.raise.to_string(),
-        amount: if is_retroactive {
-            vec![commitment_coin]
-        } else {
-            vec![capital_coin, commitment_coin]
-        },
-    };
-
-    Ok(Response::new().add_message(send).add_attribute(
-        format!("{}.capital_call.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
+    Ok(Response::new()
+        .add_attribute(
+            format!("{}.capital_call.sequence", env.contract.address),
+            format!("{}", state.sequence),
+        )
+        .add_message(
+            wasm_execute(
+                state.raise.clone(),
+                &RaiseExecuteMsg::ClaimInvestment { amount },
+                vec![
+                    coin(
+                        state.capital_to_shares(amount).into(),
+                        format!("{}.commitment", state.raise),
+                    ),
+                    coin(amount as u128, state.capital_denom),
+                ],
+            )
+            .unwrap(),
+        ))
 }
 
 pub fn try_claim_redemption(
@@ -466,135 +392,36 @@ mod tests {
     }
 
     #[test]
-    fn issue_capital_call() {
+    fn claim_investment() {
         let mut deps = default_deps(Some(|state| {
             state.status = Status::Accepted;
         }));
-        deps.querier.base.update_balance(
-            Addr::unchecked("cosmos2contract"),
-            coins(100, "raise_1.commitment"),
-        );
 
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("raise_1", &vec![]),
-            HandleMsg::IssueCapitalCall {
-                capital_call: CapitalCallIssuance {
-                    amount: 10_000,
-                    days_of_notice: None,
-                },
-            },
-        )
-        .unwrap();
-        assert_eq!(0, res.messages.len());
-    }
-
-    #[test]
-    fn issue_capital_call_bad_actor() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
-        deps.querier.base.update_balance(
-            Addr::unchecked("cosmos2contract"),
-            coins(100, "raise_1.commitment"),
-        );
-
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("bad_actor", &vec![]),
-            HandleMsg::IssueCapitalCall {
-                capital_call: CapitalCallIssuance {
-                    amount: 10_000,
-                    days_of_notice: None,
-                },
-            },
-        );
-        assert!(res.is_err());
-    }
-
-    #[test]
-    fn issue_capital_call_with_bad_amount() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
-        deps.querier.base.update_balance(
-            Addr::unchecked("cosmos2contract"),
-            coins(100, "raise_1.commitment"),
-        );
-
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("raise_1", &vec![]),
-            HandleMsg::IssueCapitalCall {
-                capital_call: CapitalCallIssuance {
-                    amount: 10_001,
-                    days_of_notice: None,
-                },
-            },
-        );
-        assert_eq!(true, res.is_err());
-    }
-
-    #[test]
-    fn close_capital_call() {
-        let mut deps = mock_dependencies(&coins(100_000, "stable_coin"));
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        state.active_capital_call = Some(CapitalCall {
-            sequence: 1,
-            amount: 100_000,
-            days_of_notice: None,
-        });
-        config(&mut deps.storage).save(&state).unwrap();
-
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("raise_1", &coins(1_000, "investment")),
-            HandleMsg::CloseCapitalCall {
-                is_retroactive: false,
-            },
+            mock_info("lp", &vec![]),
+            HandleMsg::ClaimInvestment { amount: 10_000 },
         )
         .unwrap();
 
-        // verify commitment and capital sent to raise
+        // verify exec message sent
         assert_eq!(1, res.messages.len());
-        let (to_address, coins) = send_msg(msg_at_index(&res, 0));
-        assert_eq!("raise_1", to_address);
-        let capital_coin = coins.get(0).unwrap();
-        assert_eq!(100_000, capital_coin.amount.u128());
-        assert_eq!("stable_coin", capital_coin.denom);
-        let commitment_coin = coins.get(1).unwrap();
-        assert_eq!(1_000, commitment_coin.amount.u128());
+        let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert_eq!(RaiseExecuteMsg::ClaimInvestment { amount: 10_000 }, msg);
+        let commitment_coin = funds.get(0).unwrap();
+        assert_eq!(100, commitment_coin.amount.u128());
         assert_eq!("raise_1.commitment", commitment_coin.denom);
-    }
+        let capital_coin = funds.get(1).unwrap();
+        assert_eq!(10_000, capital_coin.amount.u128());
+        assert_eq!("stable_coin", capital_coin.denom);
 
-    #[test]
-    fn close_capital_call_bad_actor() {
-        let mut deps = mock_dependencies(&coins(100_000, "stable_coin"));
-
-        let mut state = State::test_default();
-        state.status = Status::Accepted;
-        state.active_capital_call = Some(CapitalCall {
-            sequence: 1,
-            amount: 100_000,
-            days_of_notice: None,
-        });
-        config(&mut deps.storage).save(&state).unwrap();
-
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("bad_actor", &coins(1_000, "investment")),
-            HandleMsg::CloseCapitalCall {
-                is_retroactive: false,
-            },
-        );
-        assert!(res.is_err());
+        // verify attributes
+        assert_eq!(1, res.attributes.len());
+        let attribute = res.attributes.get(0).unwrap();
+        assert_eq!("cosmos2contract.capital_call.sequence", attribute.key);
+        assert_eq!("1", attribute.value);
     }
 
     #[test]
