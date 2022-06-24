@@ -219,7 +219,7 @@ pub fn try_claim_redemption(
     asset: u64,
     capital: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config(deps.storage).load()?;
 
     if state.status != Status::Accepted {
         return contract_error("subscription is not accepted");
@@ -229,21 +229,19 @@ pub fn try_claim_redemption(
         return contract_error("only the lp can claim a redemption");
     }
 
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.sequence += 1;
-        state.redemptions.insert(Redemption {
-            sequence: state.sequence,
-            asset,
-            capital,
-        });
-        Ok(state)
-    })?;
+    state.sequence += 1;
+    state.redemptions.insert(Redemption {
+        sequence: state.sequence,
+        asset,
+        capital,
+    });
+    config(deps.storage).save(&state)?;
 
     let state = config_read(deps.storage).load()?;
 
     Ok(Response::new()
         .add_attribute(
-            format!("{}.redemptions.sequence", env.contract.address),
+            format!("{}.redemption.sequence", env.contract.address),
             format!("{}", state.sequence),
         )
         .add_message(
@@ -617,6 +615,12 @@ mod tests {
             msg
         );
         assert_eq!(5_000, funds.first().unwrap().amount.u128());
+
+        // verify attributes
+        assert_eq!(1, res.attributes.len());
+        let attribute = res.attributes.get(0).unwrap();
+        assert_eq!("cosmos2contract.redemption.sequence", attribute.key);
+        assert_eq!("1", attribute.value);
     }
 
     #[test]
@@ -658,6 +662,12 @@ mod tests {
         let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
         assert_eq!(RaiseExecuteMsg::ClaimDistribution { amount: 5_000 }, msg);
+
+        // verify attributes
+        assert_eq!(1, res.attributes.len());
+        let attribute = res.attributes.get(0).unwrap();
+        assert_eq!("cosmos2contract.distribution.sequence", attribute.key);
+        assert_eq!("1", attribute.value);
     }
 
     #[test]
