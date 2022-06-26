@@ -46,16 +46,14 @@ pub fn try_recover(
     info: MessageInfo,
     lp: Addr,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config_read(deps.storage).load()?;
 
     if info.sender != state.recovery_admin {
         return contract_error("only admin can recover subscription");
     }
 
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.lp = lp;
-        Ok(state)
-    })?;
+    state.lp = lp;
+    config(deps.storage).save(&state)?;
 
     Ok(Response::default())
 }
@@ -64,7 +62,7 @@ pub fn try_accept(
     deps: DepsMut<ProvenanceQuery>,
     info: MessageInfo,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config(deps.storage).load()?;
 
     if state.status != Status::Draft {
         return contract_error("subscription is not in draft status");
@@ -87,10 +85,8 @@ pub fn try_accept(
         return contract_error("commitment more than maximum commitment");
     }
 
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.status = Status::Accepted;
-        Ok(state)
-    })?;
+    state.status = Status::Accepted;
+    config(deps.storage).save(&state)?;
 
     Ok(Response::default())
 }
@@ -119,7 +115,6 @@ pub fn try_claim_investment(
             amount,
             days_of_notice: None,
         });
-
     config(deps.storage).save(&state)?;
 
     Ok(Response::new()
@@ -241,7 +236,7 @@ pub fn try_issue_withdrawal(
     to: Addr,
     amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let state = config_read(deps.storage).load()?;
+    let mut state = config(deps.storage).load()?;
 
     if state.status != Status::Accepted {
         return contract_error("subscription has not been accepted");
@@ -253,20 +248,16 @@ pub fn try_issue_withdrawal(
 
     let send = BankMsg::Send {
         to_address: to.to_string(),
-        amount: coins(amount as u128, state.capital_denom),
+        amount: coins(amount as u128, state.capital_denom.clone()),
     };
 
-    config(deps.storage).update(|mut state| -> Result<_, ContractError> {
-        state.sequence += 1;
-        state.withdrawals.insert(Withdrawal {
-            sequence: state.sequence,
-            to,
-            amount,
-        });
-        Ok(state)
-    })?;
-
-    let state = config_read(deps.storage).load()?;
+    state.sequence += 1;
+    state.withdrawals.insert(Withdrawal {
+        sequence: state.sequence,
+        to,
+        amount,
+    });
+    config(deps.storage).save(&state)?;
 
     Ok(Response::new().add_message(send).add_attribute(
         format!("{}.withdrawal.sequence", env.contract.address),
