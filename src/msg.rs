@@ -13,7 +13,6 @@ pub struct InstantiateMsg {
     pub capital_per_share: u64,
     pub min_commitment: u64,
     pub max_commitment: u64,
-    pub min_days_of_notice: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -45,12 +44,6 @@ pub enum HandleMsg {
         to: Addr,
         amount: u64,
     },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CapitalCallIssuance {
-    pub amount: u64,
-    pub days_of_notice: Option<u16>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

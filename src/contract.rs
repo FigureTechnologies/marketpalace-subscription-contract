@@ -113,7 +113,6 @@ pub fn try_claim_investment(
         .insert(crate::state::CapitalCall {
             sequence: state.sequence,
             amount,
-            days_of_notice: None,
         });
     config(deps.storage).save(&state)?;
 

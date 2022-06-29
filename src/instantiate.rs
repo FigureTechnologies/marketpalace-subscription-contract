@@ -33,7 +33,6 @@ pub fn instantiate(
         capital_per_share: msg.capital_per_share,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
-        min_days_of_notice: msg.min_days_of_notice,
         sequence: 0,
         active_capital_call: None,
         closed_capital_calls: HashSet::new(),
@@ -84,7 +83,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 50_000,
-                min_days_of_notice: None,
             },
         )
         .unwrap();
@@ -112,7 +110,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_001,
                 max_commitment: 50_000,
-                min_days_of_notice: None,
             },
         );
         assert_eq!(true, res.is_err());
@@ -134,7 +131,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 50_001,
-                min_days_of_notice: None,
             },
         );
         assert_eq!(true, res.is_err());
