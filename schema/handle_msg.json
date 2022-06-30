@@ -25,18 +25,6 @@
     {
       "type": "object",
       "required": [
-        "accept"
-      ],
-      "properties": {
-        "accept": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
         "claim_investment"
       ],
       "properties": {

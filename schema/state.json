@@ -15,7 +15,6 @@
     "recovery_admin",
     "redemptions",
     "sequence",
-    "status",
     "withdrawals"
   ],
   "properties": {
@@ -88,9 +87,6 @@
       "type": "integer",
       "format": "uint16",
       "minimum": 0.0
-    },
-    "status": {
-      "$ref": "#/definitions/Status"
     },
     "withdrawals": {
       "type": "array",
@@ -167,13 +163,6 @@
           "minimum": 0.0
         }
       }
-    },
-    "Status": {
-      "type": "string",
-      "enum": [
-        "Draft",
-        "Accepted"
-      ]
     },
     "Withdrawal": {
       "type": "object",

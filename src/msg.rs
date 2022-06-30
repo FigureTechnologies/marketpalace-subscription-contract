@@ -25,7 +25,6 @@ pub enum HandleMsg {
     Recover {
         lp: Addr,
     },
-    Accept {},
     ClaimInvestment {
         amount: u64,
     },
@@ -50,7 +49,6 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetTerms {},
-    GetStatus {},
     GetTransactions {},
 }
 

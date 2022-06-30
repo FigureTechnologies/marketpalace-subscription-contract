@@ -10,7 +10,7 @@ use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
 use crate::msg::{CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
-use crate::state::{config, config_read, Distribution, Redemption, Status, Withdrawal};
+use crate::state::{config, config_read, Distribution, Redemption, Withdrawal};
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 
@@ -24,7 +24,6 @@ pub fn execute(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
-        HandleMsg::Accept {} => try_accept(deps, info),
         HandleMsg::ClaimInvestment { amount } => try_claim_investment(deps, env, info, amount),
         HandleMsg::ClaimRedemption {
             asset,
@@ -58,39 +57,6 @@ pub fn try_recover(
     Ok(Response::default())
 }
 
-pub fn try_accept(
-    deps: DepsMut<ProvenanceQuery>,
-    info: MessageInfo,
-) -> Result<Response<ProvenanceMsg>, ContractError> {
-    let mut state = config(deps.storage).load()?;
-
-    if state.status != Status::Draft {
-        return contract_error("subscription is not in draft status");
-    }
-
-    if info.sender != state.raise {
-        return contract_error("only the raise contract can accept");
-    }
-
-    let commitment = match info.funds.first() {
-        Some(commitment) => commitment,
-        None => return contract_error("commitment required"),
-    };
-
-    if commitment.amount.u128() < state.capital_to_shares(state.min_commitment).into() {
-        return contract_error("commitment less than minimum commitment");
-    }
-
-    if commitment.amount.u128() > state.capital_to_shares(state.max_commitment).into() {
-        return contract_error("commitment more than maximum commitment");
-    }
-
-    state.status = Status::Accepted;
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::default())
-}
-
 pub fn try_claim_investment(
     deps: DepsMut<ProvenanceQuery>,
     env: Env,
@@ -98,10 +64,6 @@ pub fn try_claim_investment(
     amount: u64,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
-
-    if state.status != Status::Accepted {
-        return contract_error("subscription is not accepted");
-    }
 
     if info.sender != state.lp {
         return contract_error("only the lp can claim investment");
@@ -148,10 +110,6 @@ pub fn try_claim_redemption(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
 
-    if state.status != Status::Accepted {
-        return contract_error("subscription is not accepted");
-    }
-
     if info.sender != state.lp {
         return contract_error("only the lp can claim a redemption");
     }
@@ -194,10 +152,6 @@ pub fn try_claim_distribution(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
 
-    if state.status != Status::Accepted {
-        return contract_error("subscription has not been accepted");
-    }
-
     if info.sender != state.lp {
         return contract_error("only the lp can claim a distribution");
     }
@@ -237,10 +191,6 @@ pub fn try_issue_withdrawal(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     let mut state = config(deps.storage).load()?;
 
-    if state.status != Status::Accepted {
-        return contract_error("subscription has not been accepted");
-    }
-
     if info.sender != state.lp {
         return contract_error("only the lp can withdraw");
     }
@@ -276,7 +226,6 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
             min_commitment: state.min_commitment,
             max_commitment: state.max_commitment,
         }),
-        QueryMsg::GetStatus {} => to_binary(&state.status),
         QueryMsg::GetTransactions {} => to_binary(&Transactions {
             capital_calls: CapitalCalls {
                 active: state.active_capital_call,
@@ -352,40 +301,8 @@ mod tests {
     }
 
     #[test]
-    fn accept() {
-        let mut deps = default_deps(None);
-
-        let res = execute(
-            deps.as_mut(),
-            mock_env(),
-            mock_info("raise_1", &coins(200, "investment_raise")),
-            HandleMsg::Accept {},
-        )
-        .unwrap();
-        assert_eq!(0, res.messages.len());
-
-        // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetStatus {}).unwrap();
-        let status: Status = from_binary(&res).unwrap();
-        assert_eq!(Status::Accepted, status);
-    }
-
-    #[test]
-    fn accept_bad_actor() {
-        let res = execute(
-            default_deps(None).as_mut(),
-            mock_env(),
-            mock_info("bad_actor", &coins(200, "investment_raise")),
-            HandleMsg::Accept {},
-        );
-        assert!(res.is_err());
-    }
-
-    #[test]
     fn claim_investment() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
 
         let res = execute(
             deps.as_mut(),
@@ -416,9 +333,7 @@ mod tests {
 
     #[test]
     fn claim_redemption() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
         load_markers(&mut deps.querier);
 
         let res = execute(
@@ -458,9 +373,7 @@ mod tests {
 
     #[test]
     fn claim_redemption_bad_actor() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
         load_markers(&mut deps.querier);
 
         let res = execute(
@@ -480,9 +393,7 @@ mod tests {
 
     #[test]
     fn claim_distribution() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
 
         let res = execute(
             deps.as_mut(),
@@ -518,9 +429,7 @@ mod tests {
 
     #[test]
     fn claim_distribution_bad_actor() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
 
         let res = execute(
             deps.as_mut(),
@@ -538,9 +447,8 @@ mod tests {
 
     #[test]
     fn withdraw() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
+
         let res = execute(
             deps.as_mut(),
             mock_env(),
@@ -561,9 +469,8 @@ mod tests {
 
     #[test]
     fn withdraw_bad_actor() {
-        let mut deps = default_deps(Some(|state| {
-            state.status = Status::Accepted;
-        }));
+        let mut deps = default_deps(None);
+
         let res = execute(
             deps.as_mut(),
             mock_env(),

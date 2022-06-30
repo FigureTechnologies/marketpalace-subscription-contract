@@ -12,7 +12,6 @@ pub static CONFIG_KEY: &[u8] = b"config";
 pub struct State {
     pub recovery_admin: Addr,
     pub lp: Addr,
-    pub status: Status,
     pub raise: Addr,
     pub capital_denom: String,
     pub capital_per_share: u64,
@@ -35,12 +34,6 @@ impl State {
     pub fn capital_to_shares(&self, amount: u64) -> u64 {
         amount / self.capital_per_share
     }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub enum Status {
-    Draft,
-    Accepted,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
@@ -146,7 +139,6 @@ pub mod tests {
             State {
                 recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
-                status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,

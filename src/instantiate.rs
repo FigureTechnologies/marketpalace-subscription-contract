@@ -3,7 +3,6 @@ use crate::error::contract_error;
 use crate::msg::InstantiateMsg;
 use crate::state::config;
 use crate::state::State;
-use crate::state::Status;
 use crate::version::CONTRACT_NAME;
 use crate::version::CONTRACT_VERSION;
 use cosmwasm_std::entry_point;
@@ -26,7 +25,6 @@ pub fn instantiate(
 
     let state = State {
         raise: info.sender,
-        status: Status::Draft,
         recovery_admin: msg.recovery_admin,
         lp: msg.lp.clone(),
         capital_denom: msg.capital_denom,
