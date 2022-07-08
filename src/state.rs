@@ -34,6 +34,10 @@ impl State {
     pub fn capital_to_shares(&self, amount: u64) -> u64 {
         amount / self.capital_per_share
     }
+
+    pub fn commitment_denom(&self) -> String {
+        format!("{}.commitment", self.raise)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]

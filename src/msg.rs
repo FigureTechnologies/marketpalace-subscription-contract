@@ -25,6 +25,7 @@ pub enum HandleMsg {
     Recover {
         lp: Addr,
     },
+    CloseRemainingCommitment {},
     ClaimInvestment {
         amount: u64,
     },

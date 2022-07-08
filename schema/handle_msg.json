@@ -25,6 +25,18 @@
     {
       "type": "object",
       "required": [
+        "close_remaining_commitment"
+      ],
+      "properties": {
+        "close_remaining_commitment": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "claim_investment"
       ],
       "properties": {
