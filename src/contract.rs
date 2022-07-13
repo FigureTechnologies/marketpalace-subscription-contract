@@ -104,25 +104,25 @@ pub fn try_claim_investment(
         });
     config(deps.storage).save(&state)?;
 
+    let mut funds = vec![
+        coin(amount.into(), state.capital_denom.clone()),
+        coin(
+            state.capital_to_shares(amount).into(),
+            state.commitment_denom(),
+        ),
+    ];
+    funds.sort_by_key(|coin| coin.denom.clone());
+    let claim_investment = wasm_execute(
+        state.raise.clone(),
+        &RaiseExecuteMsg::ClaimInvestment { amount },
+        funds,
+    )?;
     Ok(Response::new()
         .add_attribute(
             format!("{}.capital_call.sequence", env.contract.address),
             format!("{}", state.sequence),
         )
-        .add_message(
-            wasm_execute(
-                state.raise.clone(),
-                &RaiseExecuteMsg::ClaimInvestment { amount },
-                vec![
-                    coin(
-                        state.capital_to_shares(amount).into(),
-                        state.commitment_denom(),
-                    ),
-                    coin(amount as u128, state.capital_denom),
-                ],
-            )
-            .unwrap(),
-        ))
+        .add_message(claim_investment))
 }
 
 pub fn try_claim_redemption(
