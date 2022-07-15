@@ -3,38 +3,15 @@
   "title": "State",
   "type": "object",
   "required": [
-    "cancelled_capital_calls",
     "capital_denom",
     "capital_per_share",
-    "closed_capital_calls",
-    "distributions",
     "lp",
     "max_commitment",
     "min_commitment",
     "raise",
-    "recovery_admin",
-    "redemptions",
-    "sequence",
-    "withdrawals"
+    "recovery_admin"
   ],
   "properties": {
-    "active_capital_call": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/CapitalCall"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
-    "cancelled_capital_calls": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/CapitalCall"
-      },
-      "uniqueItems": true
-    },
     "capital_denom": {
       "type": "string"
     },
@@ -42,20 +19,6 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
-    },
-    "closed_capital_calls": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/CapitalCall"
-      },
-      "uniqueItems": true
-    },
-    "distributions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Distribution"
-      },
-      "uniqueItems": true
     },
     "lp": {
       "$ref": "#/definitions/Addr"
@@ -75,117 +38,12 @@
     },
     "recovery_admin": {
       "$ref": "#/definitions/Addr"
-    },
-    "redemptions": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Redemption"
-      },
-      "uniqueItems": true
-    },
-    "sequence": {
-      "type": "integer",
-      "format": "uint16",
-      "minimum": 0.0
-    },
-    "withdrawals": {
-      "type": "array",
-      "items": {
-        "$ref": "#/definitions/Withdrawal"
-      },
-      "uniqueItems": true
     }
   },
   "definitions": {
     "Addr": {
       "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
       "type": "string"
-    },
-    "CapitalCall": {
-      "type": "object",
-      "required": [
-        "amount",
-        "sequence"
-      ],
-      "properties": {
-        "amount": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "sequence": {
-          "type": "integer",
-          "format": "uint16",
-          "minimum": 0.0
-        }
-      }
-    },
-    "Distribution": {
-      "type": "object",
-      "required": [
-        "amount",
-        "sequence"
-      ],
-      "properties": {
-        "amount": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "sequence": {
-          "type": "integer",
-          "format": "uint16",
-          "minimum": 0.0
-        }
-      }
-    },
-    "Redemption": {
-      "type": "object",
-      "required": [
-        "asset",
-        "capital",
-        "sequence"
-      ],
-      "properties": {
-        "asset": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "capital": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "sequence": {
-          "type": "integer",
-          "format": "uint16",
-          "minimum": 0.0
-        }
-      }
-    },
-    "Withdrawal": {
-      "type": "object",
-      "required": [
-        "amount",
-        "sequence",
-        "to"
-      ],
-      "properties": {
-        "amount": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0.0
-        },
-        "sequence": {
-          "type": "integer",
-          "format": "uint16",
-          "minimum": 0.0
-        },
-        "to": {
-          "$ref": "#/definitions/Addr"
-        }
-      }
     }
   }
 }

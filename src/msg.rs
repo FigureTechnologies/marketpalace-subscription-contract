@@ -1,7 +1,5 @@
-use crate::state::{CapitalCall, Distribution, Redemption, Withdrawal};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 use cosmwasm_std::Addr;
 
@@ -26,17 +24,13 @@ pub enum HandleMsg {
         lp: Addr,
     },
     CloseRemainingCommitment {},
-    ClaimInvestment {
-        amount: u64,
-    },
+    ClaimInvestment {},
     ClaimRedemption {
         asset: u64,
-        capital: u64,
         to: Option<Addr>,
         memo: Option<String>,
     },
     ClaimDistribution {
-        amount: u64,
         to: Option<Addr>,
         memo: Option<String>,
     },
@@ -50,7 +44,6 @@ pub enum HandleMsg {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetTerms {},
-    GetTransactions {},
 }
 
 #[derive(Deserialize, Serialize)]
@@ -60,19 +53,4 @@ pub struct Terms {
     pub capital_denom: String,
     pub min_commitment: u64,
     pub max_commitment: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct CapitalCalls {
-    pub active: Option<CapitalCall>,
-    pub closed: HashSet<CapitalCall>,
-    pub cancelled: HashSet<CapitalCall>,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Transactions {
-    pub capital_calls: CapitalCalls,
-    pub redemptions: HashSet<Redemption>,
-    pub distributions: HashSet<Distribution>,
-    pub withdrawals: HashSet<Withdrawal>,
 }

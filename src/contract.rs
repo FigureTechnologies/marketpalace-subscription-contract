@@ -1,3 +1,6 @@
+use std::convert::TryInto;
+use std::num::TryFromIntError;
+
 use crate::error::contract_error;
 use crate::raise_msg::RaiseExecuteMsg;
 use cosmwasm_std::{coin, wasm_execute};
@@ -9,8 +12,8 @@ use provwasm_std::ProvenanceMsg;
 use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
-use crate::msg::{CapitalCalls, HandleMsg, QueryMsg, Terms, Transactions};
-use crate::state::{config, config_read, Distribution, Redemption, Withdrawal};
+use crate::msg::{HandleMsg, QueryMsg, Terms};
+use crate::state::{config, config_read};
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 
@@ -25,19 +28,14 @@ pub fn execute(
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
         HandleMsg::CloseRemainingCommitment {} => try_close_remaining_commitment(deps, env, info),
-        HandleMsg::ClaimInvestment { amount } => try_claim_investment(deps, env, info, amount),
-        HandleMsg::ClaimRedemption {
-            asset,
-            capital,
-            to,
-            memo,
-        } => try_claim_redemption(deps, env, info, asset, capital, to, memo),
-        HandleMsg::ClaimDistribution { amount, to, memo } => {
-            try_claim_distribution(deps, env, info, amount, to, memo)
+        HandleMsg::ClaimInvestment {} => try_claim_investment(deps, info),
+        HandleMsg::ClaimRedemption { asset, to, memo } => {
+            try_claim_redemption(deps, env, info, asset, to, memo)
         }
-        HandleMsg::IssueWithdrawal { to, amount } => {
-            try_issue_withdrawal(deps, env, info, to, amount)
+        HandleMsg::ClaimDistribution { to, memo } => {
+            try_claim_distribution(deps, env, info, to, memo)
         }
+        HandleMsg::IssueWithdrawal { to, amount } => try_issue_withdrawal(deps, info, to, amount),
     }
 }
 
@@ -66,43 +64,33 @@ pub fn try_close_remaining_commitment(
     let state = config_read(deps.storage).load()?;
 
     if info.sender != state.lp {
-        return contract_error("only the lp can claim investment");
+        return contract_error("only the lp can close remaining commitment");
     }
 
     let remaining_commitment = deps
         .querier
         .query_balance(env.contract.address, state.commitment_denom())?;
 
-    Ok(Response::new().add_message(
-        wasm_execute(
-            state.raise.clone(),
-            &RaiseExecuteMsg::CloseRemainingCommitment {},
-            coins(remaining_commitment.amount.into(), state.commitment_denom()),
-        )
-        .unwrap(),
-    ))
+    Ok(Response::new().add_message(wasm_execute(
+        state.raise.clone(),
+        &RaiseExecuteMsg::CloseRemainingCommitment {},
+        coins(remaining_commitment.amount.into(), state.commitment_denom()),
+    )?))
 }
 
-pub fn try_claim_investment(
-    deps: DepsMut<ProvenanceQuery>,
-    env: Env,
-    info: MessageInfo,
-    amount: u64,
-) -> ContractResponse {
-    let mut state = config(deps.storage).load()?;
+pub fn try_claim_investment(deps: DepsMut<ProvenanceQuery>, info: MessageInfo) -> ContractResponse {
+    let state = config(deps.storage).load()?;
 
     if info.sender != state.lp {
         return contract_error("only the lp can claim investment");
     }
 
-    state.sequence += 1;
-    state
-        .closed_capital_calls
-        .insert(crate::state::CapitalCall {
-            sequence: state.sequence,
-            amount,
-        });
-    config(deps.storage).save(&state)?;
+    let fund = info.funds.first().ok_or("no funds found")?;
+    let amount: u64 = fund
+        .amount
+        .u128()
+        .try_into()
+        .map_err(|err: TryFromIntError| format!("{}", err))?;
 
     let mut funds = vec![
         coin(amount.into(), state.capital_denom.clone()),
@@ -112,17 +100,12 @@ pub fn try_claim_investment(
         ),
     ];
     funds.sort_by_key(|coin| coin.denom.clone());
-    let claim_investment = wasm_execute(
-        state.raise.clone(),
-        &RaiseExecuteMsg::ClaimInvestment { amount },
+
+    Ok(Response::new().add_message(wasm_execute(
+        state.raise,
+        &RaiseExecuteMsg::ClaimInvestment {},
         funds,
-    )?;
-    Ok(Response::new()
-        .add_attribute(
-            format!("{}.capital_call.sequence", env.contract.address),
-            format!("{}", state.sequence),
-        )
-        .add_message(claim_investment))
+    )?))
 }
 
 pub fn try_claim_redemption(
@@ -130,114 +113,67 @@ pub fn try_claim_redemption(
     env: Env,
     info: MessageInfo,
     asset: u64,
-    capital: u64,
     to: Option<Addr>,
     memo: Option<String>,
 ) -> ContractResponse {
-    let mut state = config(deps.storage).load()?;
+    let state = config(deps.storage).load()?;
 
     if info.sender != state.lp {
         return contract_error("only the lp can claim a redemption");
     }
 
-    state.sequence += 1;
-    state.redemptions.insert(Redemption {
-        sequence: state.sequence,
-        asset,
-        capital,
-    });
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::new()
-        .add_attribute(
-            format!("{}.redemption.sequence", env.contract.address),
-            format!("{}", state.sequence),
-        )
-        .add_message(
-            wasm_execute(
-                state.raise.clone(),
-                &RaiseExecuteMsg::ClaimRedemption {
-                    asset,
-                    capital,
-                    to: to.unwrap_or(env.contract.address),
-                    memo,
-                },
-                coins(asset as u128, format!("{}.investment", state.raise)),
-            )
-            .unwrap(),
-        ))
+    Ok(Response::new().add_message(wasm_execute(
+        state.raise.clone(),
+        &RaiseExecuteMsg::ClaimRedemption {
+            to: to.unwrap_or(env.contract.address),
+            memo,
+        },
+        coins(asset as u128, format!("{}.investment", state.raise)),
+    )?))
 }
 
 pub fn try_claim_distribution(
     deps: DepsMut<ProvenanceQuery>,
     env: Env,
     info: MessageInfo,
-    amount: u64,
     to: Option<Addr>,
     memo: Option<String>,
 ) -> ContractResponse {
-    let mut state = config(deps.storage).load()?;
+    let state = config(deps.storage).load()?;
 
     if info.sender != state.lp {
         return contract_error("only the lp can claim a distribution");
     }
 
-    state.sequence += 1;
-    state.distributions.insert(Distribution {
-        sequence: state.sequence,
-        amount,
-    });
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::new()
-        .add_attribute(
-            format!("{}.distribution.sequence", env.contract.address),
-            format!("{}", state.sequence),
+    Ok(Response::new().add_message(
+        wasm_execute(
+            state.raise,
+            &RaiseExecuteMsg::ClaimDistribution {
+                to: to.unwrap_or(env.contract.address),
+                memo,
+            },
+            vec![],
         )
-        .add_message(
-            wasm_execute(
-                state.raise,
-                &RaiseExecuteMsg::ClaimDistribution {
-                    amount,
-                    to: to.unwrap_or(env.contract.address),
-                    memo,
-                },
-                vec![],
-            )
-            .unwrap(),
-        ))
+        .unwrap(),
+    ))
 }
 
 pub fn try_issue_withdrawal(
     deps: DepsMut<ProvenanceQuery>,
-    env: Env,
     info: MessageInfo,
     to: Addr,
     amount: u64,
 ) -> ContractResponse {
-    let mut state = config(deps.storage).load()?;
+    let state = config(deps.storage).load()?;
 
     if info.sender != state.lp {
         return contract_error("only the lp can withdraw");
     }
 
-    let send = BankMsg::Send {
+    Ok(Response::new().add_message(BankMsg::Send {
         to_address: to.to_string(),
-        amount: coins(amount as u128, state.capital_denom.clone()),
-    };
-
-    state.sequence += 1;
-    state.withdrawals.insert(Withdrawal {
-        sequence: state.sequence,
-        to,
-        amount,
-    });
-    config(deps.storage).save(&state)?;
-
-    Ok(Response::new().add_message(send).add_attribute(
-        format!("{}.withdrawal.sequence", env.contract.address),
-        format!("{}", state.sequence),
-    ))
+        amount: coins(amount.into(), state.capital_denom),
+    }))
 }
 
 #[entry_point]
@@ -251,16 +187,6 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
             capital_denom: state.capital_denom,
             min_commitment: state.min_commitment,
             max_commitment: state.max_commitment,
-        }),
-        QueryMsg::GetTransactions {} => to_binary(&Transactions {
-            capital_calls: CapitalCalls {
-                active: state.active_capital_call,
-                closed: state.closed_capital_calls,
-                cancelled: state.cancelled_capital_calls,
-            },
-            redemptions: state.redemptions,
-            distributions: state.distributions,
-            withdrawals: state.withdrawals,
         }),
     }
 }
@@ -376,8 +302,8 @@ mod tests {
         let res = execute(
             deps.as_mut(),
             mock_env(),
-            mock_info("lp", &vec![]),
-            HandleMsg::ClaimInvestment { amount: 10_000 },
+            mock_info("lp", &coins(10_000, "stable_coin")),
+            HandleMsg::ClaimInvestment {},
         )
         .unwrap();
 
@@ -385,22 +311,13 @@ mod tests {
         assert_eq!(1, res.messages.len());
         let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!("raise_1", contract_addr);
-        assert_eq!(RaiseExecuteMsg::ClaimInvestment { amount: 10_000 }, msg);
+        assert_eq!(RaiseExecuteMsg::ClaimInvestment {}, msg);
         let commitment_coin = funds.get(0).unwrap();
         assert_eq!(100, commitment_coin.amount.u128());
         assert_eq!("raise_1.commitment", commitment_coin.denom);
         let capital_coin = funds.get(1).unwrap();
         assert_eq!(10_000, capital_coin.amount.u128());
         assert_eq!("stable_coin", capital_coin.denom);
-
-        // verify attributes
-        assert_eq!(1, res.attributes.len());
-        let attribute = res.attributes.get(0).unwrap();
-        assert_eq!(
-            format!("{}.capital_call.sequence", MOCK_CONTRACT_ADDR),
-            attribute.key
-        );
-        assert_eq!("1", attribute.value);
     }
 
     #[test]
@@ -411,7 +328,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             mock_info("bad_actor", &vec![]),
-            HandleMsg::ClaimInvestment { amount: 10_000 },
+            HandleMsg::ClaimInvestment {},
         );
 
         assert!(res.is_err());
@@ -428,7 +345,6 @@ mod tests {
             mock_info("lp", &vec![]),
             HandleMsg::ClaimRedemption {
                 asset: 5_000,
-                capital: 2_500,
                 to: None,
                 memo: None,
             },
@@ -441,23 +357,12 @@ mod tests {
         assert_eq!("raise_1", contract_addr);
         assert_eq!(
             RaiseExecuteMsg::ClaimRedemption {
-                asset: 5000,
-                capital: 2_500,
                 to: Addr::unchecked(MOCK_CONTRACT_ADDR),
                 memo: None,
             },
             msg
         );
         assert_eq!(5_000, funds.first().unwrap().amount.u128());
-
-        // verify attributes
-        assert_eq!(1, res.attributes.len());
-        let attribute = res.attributes.get(0).unwrap();
-        assert_eq!(
-            format!("{}.redemption.sequence", MOCK_CONTRACT_ADDR),
-            attribute.key
-        );
-        assert_eq!("1", attribute.value);
     }
 
     #[test]
@@ -471,7 +376,6 @@ mod tests {
             mock_info("bad_actor", &vec![]),
             HandleMsg::ClaimRedemption {
                 asset: 5_000,
-                capital: 2_500,
                 to: None,
                 memo: None,
             },
@@ -489,7 +393,6 @@ mod tests {
             mock_env(),
             mock_info("lp", &coins(5_000, "stable_coin")),
             HandleMsg::ClaimDistribution {
-                amount: 5_000,
                 to: None,
                 memo: None,
             },
@@ -502,21 +405,11 @@ mod tests {
         assert_eq!("raise_1", contract_addr);
         assert_eq!(
             RaiseExecuteMsg::ClaimDistribution {
-                amount: 5_000,
                 to: Addr::unchecked(MOCK_CONTRACT_ADDR),
                 memo: None
             },
             msg
         );
-
-        // verify attributes
-        assert_eq!(1, res.attributes.len());
-        let attribute = res.attributes.get(0).unwrap();
-        assert_eq!(
-            format!("{}.distribution.sequence", MOCK_CONTRACT_ADDR),
-            attribute.key
-        );
-        assert_eq!("1", attribute.value);
     }
 
     #[test]
@@ -528,7 +421,6 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &coins(5_000, "stable_coin")),
             HandleMsg::ClaimDistribution {
-                amount: 5_000,
                 to: None,
                 memo: None,
             },

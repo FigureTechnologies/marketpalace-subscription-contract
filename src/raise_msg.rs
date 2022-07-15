@@ -5,25 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum RaiseExecuteMsg {
     CloseRemainingCommitment {},
-    ClaimInvestment {
-        amount: u64,
-    },
-    ClaimRedemption {
-        asset: u64,
-        capital: u64,
-        to: Addr,
-        memo: Option<String>,
-    },
-    ClaimDistribution {
-        amount: u64,
-        to: Addr,
-        memo: Option<String>,
-    },
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum SubQueryMsg {
-    GetTerms {},
-    GetTransactions {},
+    ClaimInvestment {},
+    ClaimRedemption { to: Addr, memo: Option<String> },
+    ClaimDistribution { to: Addr, memo: Option<String> },
 }

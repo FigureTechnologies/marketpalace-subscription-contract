@@ -12,7 +12,6 @@ use cosmwasm_std::MessageInfo;
 use cosmwasm_std::Response;
 use cw2::set_contract_version;
 use provwasm_std::ProvenanceQuery;
-use std::collections::HashSet;
 
 #[entry_point]
 pub fn instantiate(
@@ -31,13 +30,6 @@ pub fn instantiate(
         capital_per_share: msg.capital_per_share,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
-        sequence: 0,
-        active_capital_call: None,
-        closed_capital_calls: HashSet::new(),
-        cancelled_capital_calls: HashSet::new(),
-        redemptions: HashSet::new(),
-        distributions: HashSet::new(),
-        withdrawals: HashSet::new(),
     };
 
     if state.not_evenly_divisble(msg.min_commitment) {

@@ -1,6 +1,5 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::hash::Hash;
 
 use cosmwasm_std::{Addr, Storage};
@@ -17,13 +16,6 @@ pub struct State {
     pub capital_per_share: u64,
     pub min_commitment: u64,
     pub max_commitment: u64,
-    pub sequence: u16,
-    pub active_capital_call: Option<CapitalCall>,
-    pub closed_capital_calls: HashSet<CapitalCall>,
-    pub cancelled_capital_calls: HashSet<CapitalCall>,
-    pub redemptions: HashSet<Redemption>,
-    pub distributions: HashSet<Distribution>,
-    pub withdrawals: HashSet<Withdrawal>,
 }
 
 impl State {
@@ -148,13 +140,6 @@ pub mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
             }
         }
     }
