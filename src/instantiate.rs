@@ -3,7 +3,6 @@ use crate::error::contract_error;
 use crate::msg::InstantiateMsg;
 use crate::state::config;
 use crate::state::State;
-use crate::state::Status;
 use crate::version::CONTRACT_NAME;
 use crate::version::CONTRACT_VERSION;
 use cosmwasm_std::entry_point;
@@ -12,11 +11,11 @@ use cosmwasm_std::Env;
 use cosmwasm_std::MessageInfo;
 use cosmwasm_std::Response;
 use cw2::set_contract_version;
-use std::collections::HashSet;
+use provwasm_std::ProvenanceQuery;
 
 #[entry_point]
 pub fn instantiate(
-    deps: DepsMut,
+    deps: DepsMut<ProvenanceQuery>,
     _env: Env,
     info: MessageInfo,
     msg: InstantiateMsg,
@@ -25,21 +24,12 @@ pub fn instantiate(
 
     let state = State {
         raise: info.sender,
-        status: Status::Draft,
         recovery_admin: msg.recovery_admin,
         lp: msg.lp.clone(),
         capital_denom: msg.capital_denom,
         capital_per_share: msg.capital_per_share,
         min_commitment: msg.min_commitment,
         max_commitment: msg.max_commitment,
-        min_days_of_notice: msg.min_days_of_notice,
-        sequence: 0,
-        active_capital_call: None,
-        closed_capital_calls: HashSet::new(),
-        cancelled_capital_calls: HashSet::new(),
-        redemptions: HashSet::new(),
-        distributions: HashSet::new(),
-        withdrawals: HashSet::new(),
     };
 
     if state.not_evenly_divisble(msg.min_commitment) {
@@ -83,7 +73,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 50_000,
-                min_days_of_notice: None,
             },
         )
         .unwrap();
@@ -111,7 +100,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_001,
                 max_commitment: 50_000,
-                min_days_of_notice: None,
             },
         );
         assert_eq!(true, res.is_err());
@@ -133,7 +121,6 @@ mod tests {
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 50_001,
-                min_days_of_notice: None,
             },
         );
         assert_eq!(true, res.is_err());

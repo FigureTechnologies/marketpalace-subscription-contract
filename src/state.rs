@@ -1,6 +1,5 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::hash::Hash;
 
 use cosmwasm_std::{Addr, Storage};
@@ -12,20 +11,11 @@ pub static CONFIG_KEY: &[u8] = b"config";
 pub struct State {
     pub recovery_admin: Addr,
     pub lp: Addr,
-    pub status: Status,
     pub raise: Addr,
     pub capital_denom: String,
     pub capital_per_share: u64,
     pub min_commitment: u64,
     pub max_commitment: u64,
-    pub min_days_of_notice: Option<u16>,
-    pub sequence: u16,
-    pub active_capital_call: Option<CapitalCall>,
-    pub closed_capital_calls: HashSet<CapitalCall>,
-    pub cancelled_capital_calls: HashSet<CapitalCall>,
-    pub redemptions: HashSet<Redemption>,
-    pub distributions: HashSet<Distribution>,
-    pub withdrawals: HashSet<Withdrawal>,
 }
 
 impl State {
@@ -36,19 +26,16 @@ impl State {
     pub fn capital_to_shares(&self, amount: u64) -> u64 {
         amount / self.capital_per_share
     }
-}
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub enum Status {
-    Draft,
-    Accepted,
+    pub fn commitment_denom(&self) -> String {
+        format!("{}.commitment", self.raise)
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, JsonSchema)]
 pub struct CapitalCall {
     pub sequence: u16,
     pub amount: u64,
-    pub days_of_notice: Option<u16>,
 }
 
 impl PartialEq for CapitalCall {
@@ -148,20 +135,11 @@ pub mod tests {
             State {
                 recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
-                status: Status::Draft,
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 min_commitment: 10_000,
                 max_commitment: 100_000,
-                min_days_of_notice: Some(10),
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
             }
         }
     }

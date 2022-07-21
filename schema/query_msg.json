@@ -13,30 +13,6 @@
         }
       },
       "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_status"
-      ],
-      "properties": {
-        "get_status": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_transactions"
-      ],
-      "properties": {
-        "get_transactions": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
     }
   ]
 }
