@@ -28,6 +28,9 @@ pub fn execute(
     match msg {
         HandleMsg::Recover { lp } => try_recover(deps, info, lp),
         HandleMsg::CloseRemainingCommitment {} => try_close_remaining_commitment(deps, env, info),
+        HandleMsg::AcceptCommitmentUpdate { forfeit_commitment } => {
+            try_accept_commitment_update(deps, info, forfeit_commitment)
+        }
         HandleMsg::ClaimInvestment {} => try_claim_investment(deps, info),
         HandleMsg::ClaimRedemption { asset, to, memo } => {
             try_claim_redemption(deps, env, info, asset, to, memo)
@@ -75,6 +78,27 @@ pub fn try_close_remaining_commitment(
         state.raise.clone(),
         &RaiseExecuteMsg::CloseRemainingCommitment {},
         coins(remaining_commitment.amount.into(), state.commitment_denom()),
+    )?))
+}
+
+pub fn try_accept_commitment_update(
+    deps: DepsMut<ProvenanceQuery>,
+    info: MessageInfo,
+    forfeit_commitment: Option<u64>,
+) -> ContractResponse {
+    let state = config(deps.storage).load()?;
+
+    if info.sender != state.lp {
+        return contract_error("only the lp can accept commitment update");
+    }
+
+    Ok(Response::new().add_message(wasm_execute(
+        state.raise.clone(),
+        &RaiseExecuteMsg::AcceptCommitmentUpdate {},
+        match forfeit_commitment {
+            Some(amount) => coins(amount.into(), state.commitment_denom()),
+            None => vec![],
+        },
     )?))
 }
 
@@ -290,6 +314,68 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::CloseRemainingCommitment {},
+        );
+
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn accept_commitment_update_increase() {
+        let mut deps = default_deps(None);
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::AcceptCommitmentUpdate {
+                forfeit_commitment: None,
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert_eq!(RaiseExecuteMsg::AcceptCommitmentUpdate {}, msg);
+        assert!(funds.is_empty());
+    }
+
+    #[test]
+    fn accept_commitment_update_decrease() {
+        let mut deps = default_deps(None);
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::AcceptCommitmentUpdate {
+                forfeit_commitment: Some(1_000),
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert_eq!(RaiseExecuteMsg::AcceptCommitmentUpdate {}, msg);
+        let commitment_coin = funds.get(0).unwrap();
+        assert_eq!(1_000, commitment_coin.amount.u128());
+        assert_eq!("raise_1.commitment", commitment_coin.denom);
+    }
+
+    #[test]
+    fn accept_commitment_bad_actor() {
+        let mut deps = default_deps(None);
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::AcceptCommitmentUpdate {
+                forfeit_commitment: None,
+            },
         );
 
         assert!(res.is_err());

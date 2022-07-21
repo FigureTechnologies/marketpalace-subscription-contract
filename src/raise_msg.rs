@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum RaiseExecuteMsg {
     CloseRemainingCommitment {},
+    AcceptCommitmentUpdate {},
     ClaimInvestment {},
     ClaimRedemption { to: Addr, memo: Option<String> },
     ClaimDistribution { to: Addr, memo: Option<String> },

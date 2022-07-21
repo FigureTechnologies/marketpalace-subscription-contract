@@ -37,6 +37,28 @@
     {
       "type": "object",
       "required": [
+        "accept_commitment_update"
+      ],
+      "properties": {
+        "accept_commitment_update": {
+          "type": "object",
+          "properties": {
+            "forfeit_commitment": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0.0
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "claim_investment"
       ],
       "properties": {

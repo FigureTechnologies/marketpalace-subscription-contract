@@ -24,6 +24,9 @@ pub enum HandleMsg {
         lp: Addr,
     },
     CloseRemainingCommitment {},
+    AcceptCommitmentUpdate {
+        forfeit_commitment: Option<u64>,
+    },
     ClaimInvestment {},
     ClaimRedemption {
         asset: u64,
