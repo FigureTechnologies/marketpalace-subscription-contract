@@ -44,12 +44,5 @@ pub enum HandleMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetTerms {},
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Terms {
-    pub lp: Addr,
-    pub raise: Addr,
-    pub capital_denom: String,
+    GetState {},
 }

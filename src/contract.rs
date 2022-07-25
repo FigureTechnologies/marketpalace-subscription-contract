@@ -12,7 +12,7 @@ use provwasm_std::ProvenanceMsg;
 use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
-use crate::msg::{HandleMsg, QueryMsg, Terms};
+use crate::msg::{HandleMsg, QueryMsg};
 use crate::state::{config, config_read};
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
@@ -220,14 +220,8 @@ pub fn try_issue_withdrawal(
 
 #[entry_point]
 pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
-    let state = config_read(deps.storage).load()?;
-
     match msg {
-        QueryMsg::GetTerms {} => to_binary(&Terms {
-            lp: state.lp,
-            raise: state.raise,
-            capital_denom: state.capital_denom,
-        }),
+        QueryMsg::GetState {} => to_binary(&config_read(deps.storage).load()?),
     }
 }
 

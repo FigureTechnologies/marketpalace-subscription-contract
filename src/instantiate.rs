@@ -39,7 +39,6 @@ mod tests {
     use super::*;
     use crate::contract::query;
     use crate::msg::QueryMsg;
-    use crate::msg::Terms;
     use cosmwasm_std::from_binary;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_std::testing::mock_info;
@@ -66,8 +65,8 @@ mod tests {
         assert_eq!(0, res.messages.len());
 
         // it worked, let's query the state
-        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetTerms {}).unwrap();
-        let terms: Terms = from_binary(&res).unwrap();
-        assert_eq!("lp", terms.lp);
+        let res = query(deps.as_ref(), mock_env(), QueryMsg::GetState {}).unwrap();
+        let state: State = from_binary(&res).unwrap();
+        assert_eq!("lp", state.lp);
     }
 }
