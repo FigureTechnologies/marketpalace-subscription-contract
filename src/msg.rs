@@ -9,8 +9,6 @@ pub struct InstantiateMsg {
     pub lp: Addr,
     pub capital_denom: String,
     pub capital_per_share: u64,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -54,6 +52,4 @@ pub struct Terms {
     pub lp: Addr,
     pub raise: Addr,
     pub capital_denom: String,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
 }

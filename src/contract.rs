@@ -31,7 +31,7 @@ pub fn execute(
         HandleMsg::AcceptCommitmentUpdate { forfeit_commitment } => {
             try_accept_commitment_update(deps, info, forfeit_commitment)
         }
-        HandleMsg::ClaimInvestment {} => try_claim_investment(deps, info),
+        HandleMsg::ClaimInvestment {} => try_claim_investment(deps, env, info),
         HandleMsg::ClaimRedemption { asset, to, memo } => {
             try_claim_redemption(deps, env, info, asset, to, memo)
         }
@@ -102,7 +102,11 @@ pub fn try_accept_commitment_update(
     )?))
 }
 
-pub fn try_claim_investment(deps: DepsMut<ProvenanceQuery>, info: MessageInfo) -> ContractResponse {
+pub fn try_claim_investment(
+    deps: DepsMut<ProvenanceQuery>,
+    env: Env,
+    info: MessageInfo,
+) -> ContractResponse {
     let state = config(deps.storage).load()?;
 
     if info.sender != state.lp {
@@ -125,7 +129,21 @@ pub fn try_claim_investment(deps: DepsMut<ProvenanceQuery>, info: MessageInfo) -
     ];
     funds.sort_by_key(|coin| coin.denom.clone());
 
-    Ok(Response::new().add_message(wasm_execute(
+    let remaining_commitment = deps
+        .querier
+        .query_balance(env.contract.address, state.commitment_denom())?;
+
+    let response = if remaining_commitment.amount.u128() == 0 {
+        Response::new().add_message(wasm_execute(
+            state.raise.clone(),
+            &RaiseExecuteMsg::AcceptCommitmentUpdate {},
+            vec![],
+        )?)
+    } else {
+        Response::new()
+    };
+
+    Ok(response.add_message(wasm_execute(
         state.raise,
         &RaiseExecuteMsg::ClaimInvestment {},
         funds,
@@ -209,8 +227,6 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
             lp: state.lp,
             raise: state.raise,
             capital_denom: state.capital_denom,
-            min_commitment: state.min_commitment,
-            max_commitment: state.max_commitment,
         }),
     }
 }
@@ -384,6 +400,9 @@ mod tests {
     #[test]
     fn claim_investment() {
         let mut deps = default_deps(None);
+        deps.querier
+            .base
+            .update_balance(MOCK_CONTRACT_ADDR, coins(100, "raise_1.commitment"));
 
         let res = execute(
             deps.as_mut(),
@@ -396,6 +415,41 @@ mod tests {
         // verify exec message sent
         assert_eq!(1, res.messages.len());
         let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert_eq!(RaiseExecuteMsg::ClaimInvestment {}, msg);
+        let commitment_coin = funds.get(0).unwrap();
+        assert_eq!(100, commitment_coin.amount.u128());
+        assert_eq!("raise_1.commitment", commitment_coin.denom);
+        let capital_coin = funds.get(1).unwrap();
+        assert_eq!(10_000, capital_coin.amount.u128());
+        assert_eq!("stable_coin", capital_coin.denom);
+    }
+
+    #[test]
+    fn claim_investment_outstanding_commitment_update() {
+        let mut deps = default_deps(None);
+        deps.querier
+            .base
+            .update_balance(MOCK_CONTRACT_ADDR, coins(0, "raise_1.commitment"));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &coins(10_000, "stable_coin")),
+            HandleMsg::ClaimInvestment {},
+        )
+        .unwrap();
+
+        // verify messages sent
+        assert_eq!(2, res.messages.len());
+
+        // verify accept commitment update message
+        let (contract_addr, msg, _funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", contract_addr);
+        assert_eq!(RaiseExecuteMsg::AcceptCommitmentUpdate {}, msg);
+
+        // verify claim investment message
+        let (contract_addr, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 1));
         assert_eq!("raise_1", contract_addr);
         assert_eq!(RaiseExecuteMsg::ClaimInvestment {}, msg);
         let commitment_coin = funds.get(0).unwrap();

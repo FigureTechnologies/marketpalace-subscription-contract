@@ -14,8 +14,6 @@ pub struct State {
     pub raise: Addr,
     pub capital_denom: String,
     pub capital_per_share: u64,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
 }
 
 impl State {
@@ -138,8 +136,6 @@ pub mod tests {
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
-                min_commitment: 10_000,
-                max_commitment: 100_000,
             }
         }
     }

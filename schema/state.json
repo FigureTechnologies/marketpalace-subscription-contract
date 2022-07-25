@@ -6,8 +6,6 @@
     "capital_denom",
     "capital_per_share",
     "lp",
-    "max_commitment",
-    "min_commitment",
     "raise",
     "recovery_admin"
   ],
@@ -22,16 +20,6 @@
     },
     "lp": {
       "$ref": "#/definitions/Addr"
-    },
-    "max_commitment": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "min_commitment": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
     },
     "raise": {
       "$ref": "#/definitions/Addr"
