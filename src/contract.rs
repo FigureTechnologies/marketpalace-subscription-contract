@@ -72,12 +72,12 @@ pub fn try_close_remaining_commitment(
 
     let remaining_commitment = deps
         .querier
-        .query_balance(env.contract.address, state.commitment_denom())?;
+        .query_balance(env.contract.address, state.commitment_denom.clone())?;
 
     Ok(Response::new().add_message(wasm_execute(
         state.raise.clone(),
         &RaiseExecuteMsg::CloseRemainingCommitment {},
-        coins(remaining_commitment.amount.into(), state.commitment_denom()),
+        coins(remaining_commitment.amount.into(), state.commitment_denom),
     )?))
 }
 
@@ -96,7 +96,7 @@ pub fn try_accept_commitment_update(
         state.raise.clone(),
         &RaiseExecuteMsg::AcceptCommitmentUpdate {},
         match forfeit_commitment {
-            Some(amount) => coins(amount.into(), state.commitment_denom()),
+            Some(amount) => coins(amount.into(), state.commitment_denom),
             None => vec![],
         },
     )?))
@@ -124,14 +124,14 @@ pub fn try_claim_investment(
         coin(amount.into(), state.capital_denom.clone()),
         coin(
             state.capital_to_shares(amount).into(),
-            state.commitment_denom(),
+            state.commitment_denom.clone(),
         ),
     ];
     funds.sort_by_key(|coin| coin.denom.clone());
 
     let remaining_commitment = deps
         .querier
-        .query_balance(env.contract.address, state.commitment_denom())?;
+        .query_balance(env.contract.address, state.commitment_denom)?;
 
     let response = if remaining_commitment.amount.u128() == 0 {
         Response::new().add_message(wasm_execute(

@@ -25,6 +25,8 @@ pub fn instantiate(
         raise: info.sender,
         recovery_admin: msg.recovery_admin,
         lp: msg.lp.clone(),
+        commitment_denom: msg.commitment_denom,
+        investment_denom: msg.investment_denom,
         capital_denom: msg.capital_denom,
         capital_per_share: msg.capital_per_share,
     };
@@ -57,6 +59,8 @@ mod tests {
             InstantiateMsg {
                 recovery_admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
+                commitment_denom: String::from("raise_1.commitment"),
+                investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
             },

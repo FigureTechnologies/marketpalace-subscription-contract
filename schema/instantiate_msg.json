@@ -5,6 +5,8 @@
   "required": [
     "capital_denom",
     "capital_per_share",
+    "commitment_denom",
+    "investment_denom",
     "lp",
     "recovery_admin"
   ],
@@ -16,6 +18,12 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0.0
+    },
+    "commitment_denom": {
+      "type": "string"
+    },
+    "investment_denom": {
+      "type": "string"
     },
     "lp": {
       "$ref": "#/definitions/Addr"
