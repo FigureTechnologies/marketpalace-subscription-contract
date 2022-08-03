@@ -1,4 +1,7 @@
-use cosmwasm_std::StdError;
+use std::num::TryFromIntError;
+
+use cosmwasm_std::{Response, StdError};
+use provwasm_std::ProvenanceMsg;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -24,6 +27,12 @@ impl From<String> for ContractError {
     }
 }
 
-pub fn contract_error<T>(err: &str) -> Result<T, ContractError> {
+impl From<TryFromIntError> for ContractError {
+    fn from(err: TryFromIntError) -> Self {
+        ContractError::Std(StdError::generic_err(err.to_string()))
+    }
+}
+
+pub fn contract_error(err: &str) -> Result<Response<ProvenanceMsg>, ContractError> {
     Err(ContractError::Std(StdError::generic_err(err)))
 }

@@ -23,17 +23,8 @@ pub enum HandleMsg {
     Recover {
         lp: Addr,
     },
-    CloseRemainingCommitment {},
-    AcceptCommitmentUpdate {
-        forfeit_commitment: Option<u64>,
-    },
-    ClaimInvestment {},
-    ClaimRedemption {
-        asset: u64,
-        to: Option<Addr>,
-        memo: Option<String>,
-    },
-    ClaimDistribution {
+    CompleteAssetExchange {
+        exchange: AssetExchange,
         to: Option<Addr>,
         memo: Option<String>,
     },
@@ -41,6 +32,20 @@ pub enum HandleMsg {
         to: Addr,
         amount: u64,
     },
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct AssetExchange {
+    pub investment: Option<i64>,
+    pub commitment: Option<i64>,
+    pub capital: Option<i64>,
+    pub date: Option<ExchangeDate>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum ExchangeDate {
+    Due(u64),
+    Available(u64),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
