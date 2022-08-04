@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use crate::error::contract_error;
 use crate::raise_msg::RaiseExecuteMsg;
 use cosmwasm_std::{coin, wasm_execute};
@@ -47,17 +45,26 @@ pub fn execute(
             let mut funds = Vec::new();
             if let Some(investment) = exchange.investment {
                 if investment < 0 {
-                    funds.push(coin(investment.try_into()?, state.investment_denom.clone()));
+                    funds.push(coin(
+                        investment.unsigned_abs().into(),
+                        state.investment_denom.clone(),
+                    ));
                 }
             }
             if let Some(commitment) = exchange.commitment {
                 if commitment < 0 {
-                    funds.push(coin(commitment.try_into()?, state.commitment_denom.clone()));
+                    funds.push(coin(
+                        commitment.unsigned_abs().into(),
+                        state.commitment_denom.clone(),
+                    ));
                 }
             }
             if let Some(capital) = exchange.capital {
                 if capital < 0 {
-                    funds.push(coin(capital.try_into()?, state.capital_denom.clone()));
+                    funds.push(coin(
+                        capital.unsigned_abs().into(),
+                        state.capital_denom.clone(),
+                    ));
                 }
             }
 
@@ -95,21 +102,14 @@ mod tests {
     use crate::mock::execute_args;
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
+    use crate::msg::AssetExchange;
     use crate::state::State;
     use cosmwasm_std::testing::MockApi;
     use cosmwasm_std::testing::MockStorage;
-    use cosmwasm_std::testing::MOCK_CONTRACT_ADDR;
     use cosmwasm_std::testing::{mock_env, mock_info};
+    use cosmwasm_std::Addr;
     use cosmwasm_std::OwnedDeps;
-    use cosmwasm_std::{coins, from_binary, Addr};
-    use provwasm_mocks::{mock_dependencies, must_read_binary_file, ProvenanceMockQuerier};
-    use provwasm_std::Marker;
-
-    fn load_markers(querier: &mut ProvenanceMockQuerier) {
-        let bin = must_read_binary_file("testdata/marker.json");
-        let expected_marker: Marker = from_binary(&bin).unwrap();
-        querier.with_markers(vec![expected_marker.clone()]);
-    }
+    use provwasm_mocks::{mock_dependencies, ProvenanceMockQuerier};
 
     pub fn default_deps(
         update_state: Option<fn(&mut State)>,
@@ -149,6 +149,94 @@ mod tests {
             },
         );
         assert_eq!(true, res.is_err());
+    }
+
+    #[test]
+    fn complete_asset_exchange_accept_only() {
+        let mut deps = default_deps(None);
+
+        let exchange = AssetExchange {
+            investment: Some(1_000),
+            commitment: Some(1_000),
+            capital: Some(1_000),
+            date: None,
+        };
+        let to = Some(Addr::unchecked("lp_side_account"));
+        let memo = Some(String::from("memo"));
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (recipient, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", recipient);
+        assert_eq!(
+            RaiseExecuteMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to,
+                memo
+            },
+            msg
+        );
+
+        // verify no funds sent
+        assert_eq!(0, funds.len());
+    }
+
+    #[test]
+    fn complete_asset_exchange_send_only() {
+        let mut deps = default_deps(None);
+
+        let exchange = AssetExchange {
+            investment: Some(-1_000),
+            commitment: Some(-1_000),
+            capital: Some(-1_000),
+            date: None,
+        };
+        let to = Some(Addr::unchecked("lp_side_account"));
+        let memo = Some(String::from("memo"));
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (recipient, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", recipient);
+        assert_eq!(
+            RaiseExecuteMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to,
+                memo
+            },
+            msg
+        );
+
+        // verify funds sent
+        assert_eq!(3, funds.len());
+        let investment = funds.get(0).unwrap();
+        assert_eq!(1_000, investment.amount.u128());
+        let commitment = funds.get(1).unwrap();
+        assert_eq!(1_000, commitment.amount.u128());
+        let capital = funds.get(2).unwrap();
+        assert_eq!(1_000, capital.amount.u128());
     }
 
     #[test]
