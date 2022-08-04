@@ -3,15 +3,18 @@
   "title": "State",
   "type": "object",
   "required": [
+    "admin",
     "capital_denom",
     "capital_per_share",
     "commitment_denom",
     "investment_denom",
     "lp",
-    "raise",
-    "recovery_admin"
+    "raise"
   ],
   "properties": {
+    "admin": {
+      "$ref": "#/definitions/Addr"
+    },
     "capital_denom": {
       "type": "string"
     },
@@ -30,9 +33,6 @@
       "$ref": "#/definitions/Addr"
     },
     "raise": {
-      "$ref": "#/definitions/Addr"
-    },
-    "recovery_admin": {
       "$ref": "#/definitions/Addr"
     }
   },

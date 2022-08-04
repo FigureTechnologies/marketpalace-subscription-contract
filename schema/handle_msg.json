@@ -25,6 +25,42 @@
     {
       "type": "object",
       "required": [
+        "authorize_asset_exchange"
+      ],
+      "properties": {
+        "authorize_asset_exchange": {
+          "type": "object",
+          "required": [
+            "exchange"
+          ],
+          "properties": {
+            "exchange": {
+              "$ref": "#/definitions/AssetExchange"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "complete_asset_exchange"
       ],
       "properties": {
@@ -93,14 +129,14 @@
     "AssetExchange": {
       "type": "object",
       "properties": {
-        "capital": {
+        "cap": {
           "type": [
             "integer",
             "null"
           ],
           "format": "int64"
         },
-        "commitment": {
+        "com": {
           "type": [
             "integer",
             "null"
@@ -117,7 +153,7 @@
             }
           ]
         },
-        "investment": {
+        "inv": {
           "type": [
             "integer",
             "null"

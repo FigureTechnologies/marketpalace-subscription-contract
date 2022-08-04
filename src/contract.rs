@@ -10,7 +10,9 @@ use provwasm_std::ProvenanceQuery;
 
 use crate::error::ContractError;
 use crate::msg::{HandleMsg, QueryMsg};
-use crate::state::{config, config_read};
+use crate::state::{
+    asset_exchange_storage, state_storage, state_storage_read, AssetExchangeAuthorization,
+};
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 
@@ -24,22 +26,52 @@ pub fn execute(
 ) -> ContractResponse {
     match msg {
         HandleMsg::Recover { lp } => {
-            let mut state = config_read(deps.storage).load()?;
+            let mut state = state_storage_read(deps.storage).load()?;
 
-            if info.sender != state.recovery_admin {
+            if info.sender != state.admin {
                 return contract_error("only admin can recover subscription");
             }
 
             state.lp = lp;
-            config(deps.storage).save(&state)?;
+            state_storage(deps.storage).save(&state)?;
+
+            Ok(Response::default())
+        }
+        HandleMsg::AuthorizeAssetExchange { exchange, to, memo } => {
+            let state = state_storage(deps.storage).load()?;
+
+            if info.sender != state.lp {
+                return contract_error("only the lp can authorize asset exchange");
+            }
+
+            let mut exchanges = asset_exchange_storage(deps.storage)
+                .may_load()?
+                .unwrap_or_default();
+            exchanges.push(AssetExchangeAuthorization { exchange, to, memo });
+            asset_exchange_storage(deps.storage).save(&exchanges)?;
 
             Ok(Response::default())
         }
         HandleMsg::CompleteAssetExchange { exchange, to, memo } => {
-            let state = config(deps.storage).load()?;
+            let state = state_storage(deps.storage).load()?;
 
-            if info.sender != state.lp {
-                return contract_error("only the lp complete asset exchange");
+            if info.sender == state.admin {
+                let authorization = AssetExchangeAuthorization {
+                    exchange: exchange.clone(),
+                    to: to.clone(),
+                    memo: memo.clone(),
+                };
+                let mut exchanges = asset_exchange_storage(deps.storage).load()?;
+
+                let index = exchanges
+                    .iter()
+                    .position(|e| &authorization == e)
+                    .ok_or("no previously authorized asset exchange matched")?;
+                exchanges.remove(index);
+
+                asset_exchange_storage(deps.storage).save(&exchanges)?;
+            } else if info.sender != state.lp {
+                return contract_error("only the lp or admin can complete asset exchange");
             }
 
             let mut funds = Vec::new();
@@ -75,7 +107,7 @@ pub fn execute(
             )?))
         }
         HandleMsg::IssueWithdrawal { to, amount } => {
-            let state = config(deps.storage).load()?;
+            let state = state_storage(deps.storage).load()?;
 
             if info.sender != state.lp {
                 return contract_error("only the lp can withdraw");
@@ -92,7 +124,7 @@ pub fn execute(
 #[entry_point]
 pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::GetState {} => to_binary(&config_read(deps.storage).load()?),
+        QueryMsg::GetState {} => to_binary(&state_storage_read(deps.storage).load()?),
     }
 }
 
@@ -103,6 +135,7 @@ mod tests {
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
     use crate::msg::AssetExchange;
+    use crate::state::asset_exchange_storage_read;
     use crate::state::State;
     use cosmwasm_std::testing::MockApi;
     use cosmwasm_std::testing::MockStorage;
@@ -120,7 +153,7 @@ mod tests {
         if let Some(update) = update_state {
             update(&mut state);
         }
-        config(&mut deps.storage).save(&state).unwrap();
+        state_storage(&mut deps.storage).save(&state).unwrap();
 
         deps
     }
@@ -149,6 +182,61 @@ mod tests {
             },
         );
         assert_eq!(true, res.is_err());
+    }
+
+    #[test]
+    fn authorize_asset_exchange() {
+        let mut deps = default_deps(None);
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::AuthorizeAssetExchange {
+                exchange: AssetExchange {
+                    investment: Some(1_000),
+                    commitment: Some(1_000),
+                    capital: Some(1_000),
+                    date: None,
+                },
+                to: Some(Addr::unchecked("lp_side_account")),
+                memo: Some(String::from("memo")),
+            },
+        )
+        .unwrap();
+
+        // verify asset exchange authorization saved
+        assert_eq!(
+            1,
+            asset_exchange_storage_read(&deps.storage)
+                .load()
+                .unwrap()
+                .len()
+        );
+    }
+
+    #[test]
+    fn authorize_asset_exchange_bad_actor() {
+        let mut deps = default_deps(None);
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::AuthorizeAssetExchange {
+                exchange: AssetExchange {
+                    investment: Some(1_000),
+                    commitment: Some(1_000),
+                    capital: Some(1_000),
+                    date: None,
+                },
+                to: Some(Addr::unchecked("lp_side_account")),
+                memo: Some(String::from("memo")),
+            },
+        );
+
+        // verify error
+        assert!(res.is_err());
     }
 
     #[test]
@@ -237,6 +325,101 @@ mod tests {
         assert_eq!(1_000, commitment.amount.u128());
         let capital = funds.get(2).unwrap();
         assert_eq!(1_000, capital.amount.u128());
+    }
+
+    #[test]
+    fn complete_asset_exchange_admin() {
+        let mut deps = default_deps(None);
+
+        let exchange = AssetExchange {
+            investment: Some(1_000),
+            commitment: Some(1_000),
+            capital: Some(1_000),
+            date: None,
+        };
+        let to = Some(Addr::unchecked("lp_side_account"));
+        let memo = Some(String::from("memo"));
+
+        asset_exchange_storage(&mut deps.storage)
+            .save(&vec![AssetExchangeAuthorization {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            }])
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &vec![]),
+            HandleMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (recipient, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", recipient);
+        assert_eq!(
+            RaiseExecuteMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to,
+                memo
+            },
+            msg
+        );
+
+        // verify no funds sent
+        assert_eq!(0, funds.len());
+
+        // verify asset exchange authorization removed
+        assert_eq!(
+            0,
+            asset_exchange_storage_read(&deps.storage)
+                .load()
+                .unwrap()
+                .len()
+        );
+    }
+
+    #[test]
+    fn complete_asset_exchange_bad_actor() {
+        let mut deps = default_deps(None);
+
+        let exchange = AssetExchange {
+            investment: Some(1_000),
+            commitment: Some(1_000),
+            capital: Some(1_000),
+            date: None,
+        };
+        let to = Some(Addr::unchecked("lp_side_account"));
+        let memo = Some(String::from("memo"));
+
+        asset_exchange_storage(&mut deps.storage)
+            .save(&vec![AssetExchangeAuthorization {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            }])
+            .unwrap();
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("bad_actor", &vec![]),
+            HandleMsg::CompleteAssetExchange {
+                exchange: exchange.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            },
+        );
+
+        // verify error
+        assert!(res.is_err());
     }
 
     #[test]

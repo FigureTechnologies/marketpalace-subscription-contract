@@ -3,7 +3,7 @@ use std::hash::Hash;
 
 use crate::error::ContractError;
 use crate::msg::MigrateMsg;
-use crate::state::config;
+use crate::state::state_storage;
 use crate::state::State;
 use crate::state::CONFIG_KEY;
 use crate::version::CONTRACT_NAME;
@@ -31,7 +31,7 @@ pub fn migrate(
     let old_state: StateV1_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
 
     let new_state = State {
-        recovery_admin: old_state.recovery_admin,
+        admin: old_state.recovery_admin,
         lp: old_state.lp,
         raise: old_state.raise.clone(),
         commitment_denom: format!("{}.commitment", old_state.raise),
@@ -40,7 +40,7 @@ pub fn migrate(
         capital_per_share: old_state.capital_per_share,
     };
 
-    config(deps.storage).save(&new_state)?;
+    state_storage(deps.storage).save(&new_state)?;
 
     Ok(Response::default())
 }
@@ -195,7 +195,7 @@ mod tests {
 
         assert_eq!(
             State {
-                recovery_admin: Addr::unchecked("marketpalace"),
+                admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("raise_1.commitment"),

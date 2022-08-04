@@ -4,11 +4,14 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
+use crate::msg::AssetExchange;
+
 pub static CONFIG_KEY: &[u8] = b"config";
+pub static ASSET_EXCHANGE_KEY: &[u8] = b"asset_exchange";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
-    pub recovery_admin: Addr,
+    pub admin: Addr,
     pub lp: Addr,
     pub raise: Addr,
     pub commitment_denom: String,
@@ -27,12 +30,31 @@ impl State {
     }
 }
 
-pub fn config(storage: &mut dyn Storage) -> Singleton<State> {
+pub fn state_storage(storage: &mut dyn Storage) -> Singleton<State> {
     singleton(storage, CONFIG_KEY)
 }
 
-pub fn config_read(storage: &dyn Storage) -> ReadonlySingleton<State> {
+pub fn state_storage_read(storage: &dyn Storage) -> ReadonlySingleton<State> {
     singleton_read(storage, CONFIG_KEY)
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct AssetExchangeAuthorization {
+    pub exchange: AssetExchange,
+    pub to: Option<Addr>,
+    pub memo: Option<String>,
+}
+
+pub fn asset_exchange_storage(
+    storage: &mut dyn Storage,
+) -> Singleton<Vec<AssetExchangeAuthorization>> {
+    singleton(storage, ASSET_EXCHANGE_KEY)
+}
+
+pub fn asset_exchange_storage_read(
+    storage: &dyn Storage,
+) -> ReadonlySingleton<Vec<AssetExchangeAuthorization>> {
+    singleton_read(storage, ASSET_EXCHANGE_KEY)
 }
 
 #[cfg(test)]
@@ -42,7 +64,7 @@ pub mod tests {
     impl State {
         pub fn test_default() -> State {
             State {
-                recovery_admin: Addr::unchecked("admin"),
+                admin: Addr::unchecked("admin"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("raise_1.commitment"),
