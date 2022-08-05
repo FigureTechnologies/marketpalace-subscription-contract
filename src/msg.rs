@@ -60,7 +60,9 @@ pub struct AssetExchange {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub enum ExchangeDate {
+    #[serde(rename = "due")]
     Due(u64),
+    #[serde(rename = "avl")]
     Available(u64),
 }
 
