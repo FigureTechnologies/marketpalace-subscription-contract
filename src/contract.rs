@@ -99,6 +99,7 @@ pub fn execute(
                     ));
                 }
             }
+            funds.sort_by_key(|coin| coin.denom.clone());
 
             Ok(Response::new().add_message(wasm_execute(
                 state.raise,
@@ -319,12 +320,12 @@ mod tests {
 
         // verify funds sent
         assert_eq!(3, funds.len());
-        let investment = funds.get(0).unwrap();
-        assert_eq!(1_000, investment.amount.u128());
+        let capital = funds.get(0).unwrap();
+        assert_eq!(1_000, capital.amount.u128());
         let commitment = funds.get(1).unwrap();
         assert_eq!(1_000, commitment.amount.u128());
-        let capital = funds.get(2).unwrap();
-        assert_eq!(1_000, capital.amount.u128());
+        let investment = funds.get(2).unwrap();
+        assert_eq!(1_000, investment.amount.u128());
     }
 
     #[test]
