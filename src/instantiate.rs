@@ -1,6 +1,11 @@
+use std::convert::TryInto;
+
 use crate::contract::ContractResponse;
+use crate::msg::AssetExchange;
 use crate::msg::InstantiateMsg;
+use crate::state::asset_exchange_storage;
 use crate::state::state_storage;
+use crate::state::AssetExchangeAuthorization;
 use crate::state::State;
 use crate::version::CONTRACT_NAME;
 use crate::version::CONTRACT_VERSION;
@@ -33,6 +38,19 @@ pub fn instantiate(
 
     state_storage(deps.storage).save(&state)?;
 
+    if let Some(commitment) = msg.initial_commitment {
+        asset_exchange_storage(deps.storage).save(&vec![AssetExchangeAuthorization {
+            exchange: AssetExchange {
+                investment: None,
+                commitment: Some(commitment.try_into()?),
+                capital: None,
+                date: None,
+            },
+            to: None,
+            memo: None,
+        }])?;
+    }
+
     Ok(Response::default())
 }
 
@@ -41,6 +59,7 @@ mod tests {
     use super::*;
     use crate::contract::query;
     use crate::msg::QueryMsg;
+    use crate::state::asset_exchange_storage_read;
     use cosmwasm_std::from_binary;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_std::testing::mock_info;
@@ -63,6 +82,7 @@ mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
+                initial_commitment: Some(100),
             },
         )
         .unwrap();
@@ -72,5 +92,14 @@ mod tests {
         let res = query(deps.as_ref(), mock_env(), QueryMsg::GetState {}).unwrap();
         let state: State = from_binary(&res).unwrap();
         assert_eq!("lp", state.lp);
+
+        // verify authorized asset exchange for commitment
+        assert_eq!(
+            1,
+            asset_exchange_storage_read(&deps.storage)
+                .load()
+                .unwrap()
+                .len()
+        );
     }
 }

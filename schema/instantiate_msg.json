@@ -25,6 +25,14 @@
     "commitment_denom": {
       "type": "string"
     },
+    "initial_commitment": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "minimum": 0.0
+    },
     "investment_denom": {
       "type": "string"
     },
