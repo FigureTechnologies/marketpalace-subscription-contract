@@ -61,6 +61,42 @@
     {
       "type": "object",
       "required": [
+        "cancel_asset_exchange_authorization"
+      ],
+      "properties": {
+        "cancel_asset_exchange_authorization": {
+          "type": "object",
+          "required": [
+            "exchange"
+          ],
+          "properties": {
+            "exchange": {
+              "$ref": "#/definitions/AssetExchange"
+            },
+            "memo": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "to": {
+              "anyOf": [
+                {
+                  "$ref": "#/definitions/Addr"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
         "complete_asset_exchange"
       ],
       "properties": {

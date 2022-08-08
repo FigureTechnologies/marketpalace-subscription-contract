@@ -7,7 +7,7 @@ use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 use crate::msg::AssetExchange;
 
 pub static CONFIG_KEY: &[u8] = b"config";
-pub static ASSET_EXCHANGE_KEY: &[u8] = b"asset_exchange";
+pub static ASSET_EXCHANGE_AUTHORIZATION_KEY: &[u8] = b"asset_exchange_authorizations";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct State {
@@ -48,13 +48,13 @@ pub struct AssetExchangeAuthorization {
 pub fn asset_exchange_storage(
     storage: &mut dyn Storage,
 ) -> Singleton<Vec<AssetExchangeAuthorization>> {
-    singleton(storage, ASSET_EXCHANGE_KEY)
+    singleton(storage, ASSET_EXCHANGE_AUTHORIZATION_KEY)
 }
 
 pub fn asset_exchange_storage_read(
     storage: &dyn Storage,
 ) -> ReadonlySingleton<Vec<AssetExchangeAuthorization>> {
-    singleton_read(storage, ASSET_EXCHANGE_KEY)
+    singleton_read(storage, ASSET_EXCHANGE_AUTHORIZATION_KEY)
 }
 
 #[cfg(test)]

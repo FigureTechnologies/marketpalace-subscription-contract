@@ -29,6 +29,11 @@ pub enum HandleMsg {
         to: Option<Addr>,
         memo: Option<String>,
     },
+    CancelAssetExchangeAuthorization {
+        exchange: AssetExchange,
+        to: Option<Addr>,
+        memo: Option<String>,
+    },
     CompleteAssetExchange {
         exchange: AssetExchange,
         to: Option<Addr>,
