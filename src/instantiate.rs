@@ -42,7 +42,7 @@ pub fn instantiate(
         asset_exchange_storage(deps.storage).save(&vec![AssetExchangeAuthorization {
             exchange: AssetExchange {
                 investment: None,
-                commitment: Some(commitment.try_into()?),
+                commitment_in_shares: Some(commitment.try_into()?),
                 capital: None,
                 date: None,
             },

@@ -54,7 +54,7 @@ pub struct AssetExchange {
     #[serde(rename = "com")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
-    pub commitment: Option<i64>,
+    pub commitment_in_shares: Option<i64>,
     #[serde(rename = "cap")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]

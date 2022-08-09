@@ -86,7 +86,7 @@ pub fn execute(
                     ));
                 }
             }
-            if let Some(commitment) = exchange.commitment {
+            if let Some(commitment) = exchange.commitment_in_shares {
                 if commitment < 0 {
                     funds.push(coin(
                         commitment.unsigned_abs().into(),
@@ -219,7 +219,7 @@ mod tests {
             HandleMsg::AuthorizeAssetExchange {
                 exchange: AssetExchange {
                     investment: Some(1_000),
-                    commitment: Some(1_000),
+                    commitment_in_shares: Some(1_000),
                     capital: Some(1_000),
                     date: None,
                 },
@@ -250,7 +250,7 @@ mod tests {
             HandleMsg::AuthorizeAssetExchange {
                 exchange: AssetExchange {
                     investment: Some(1_000),
-                    commitment: Some(1_000),
+                    commitment_in_shares: Some(1_000),
                     capital: Some(1_000),
                     date: None,
                 },
@@ -269,7 +269,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(1_000),
-            commitment: Some(1_000),
+            commitment_in_shares: Some(1_000),
             capital: Some(1_000),
             date: None,
         };
@@ -312,7 +312,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(1_000),
-            commitment: Some(1_000),
+            commitment_in_shares: Some(1_000),
             capital: Some(1_000),
             date: None,
         };
@@ -348,7 +348,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(1_000),
-            commitment: Some(1_000),
+            commitment_in_shares: Some(1_000),
             capital: Some(1_000),
             date: None,
         };
@@ -389,7 +389,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(-1_000),
-            commitment: Some(-1_000),
+            commitment_in_shares: Some(-1_000),
             capital: Some(-1_000),
             date: None,
         };
@@ -436,7 +436,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(1_000),
-            commitment: Some(1_000),
+            commitment_in_shares: Some(1_000),
             capital: Some(1_000),
             date: None,
         };
@@ -495,7 +495,7 @@ mod tests {
 
         let exchange = AssetExchange {
             investment: Some(1_000),
-            commitment: Some(1_000),
+            commitment_in_shares: Some(1_000),
             capital: Some(1_000),
             date: None,
         };
