@@ -40,18 +40,18 @@ pub fn state_storage_read(storage: &dyn Storage) -> ReadonlySingleton<State> {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
 pub struct AssetExchangeAuthorization {
-    pub exchange: AssetExchange,
+    pub exchanges: Vec<AssetExchange>,
     pub to: Option<Addr>,
     pub memo: Option<String>,
 }
 
-pub fn asset_exchange_storage(
+pub fn asset_exchange_authorization_storage(
     storage: &mut dyn Storage,
 ) -> Singleton<Vec<AssetExchangeAuthorization>> {
     singleton(storage, ASSET_EXCHANGE_AUTHORIZATION_KEY)
 }
 
-pub fn asset_exchange_storage_read(
+pub fn asset_exchange_authorization_storage_read(
     storage: &dyn Storage,
 ) -> ReadonlySingleton<Vec<AssetExchangeAuthorization>> {
     singleton_read(storage, ASSET_EXCHANGE_AUTHORIZATION_KEY)

@@ -7,7 +7,7 @@ use crate::msg::AssetExchange;
 #[serde(rename_all = "snake_case")]
 pub enum RaiseExecuteMsg {
     CompleteAssetExchange {
-        exchange: AssetExchange,
+        exchanges: Vec<AssetExchange>,
         to: Option<Addr>,
         memo: Option<String>,
     },

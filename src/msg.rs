@@ -25,17 +25,17 @@ pub enum HandleMsg {
         lp: Addr,
     },
     AuthorizeAssetExchange {
-        exchange: AssetExchange,
+        exchanges: Vec<AssetExchange>,
         to: Option<Addr>,
         memo: Option<String>,
     },
     CancelAssetExchangeAuthorization {
-        exchange: AssetExchange,
+        exchanges: Vec<AssetExchange>,
         to: Option<Addr>,
         memo: Option<String>,
     },
     CompleteAssetExchange {
-        exchange: AssetExchange,
+        exchanges: Vec<AssetExchange>,
         to: Option<Addr>,
         memo: Option<String>,
     },

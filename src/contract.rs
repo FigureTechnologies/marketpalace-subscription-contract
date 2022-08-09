@@ -11,7 +11,8 @@ use provwasm_std::ProvenanceQuery;
 use crate::error::ContractError;
 use crate::msg::{AssetExchange, HandleMsg, QueryMsg};
 use crate::state::{
-    asset_exchange_storage, state_storage, state_storage_read, AssetExchangeAuthorization,
+    asset_exchange_authorization_storage, state_storage, state_storage_read,
+    AssetExchangeAuthorization,
 };
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
@@ -37,39 +38,55 @@ pub fn execute(
 
             Ok(Response::default())
         }
-        HandleMsg::AuthorizeAssetExchange { exchange, to, memo } => {
+        HandleMsg::AuthorizeAssetExchange {
+            exchanges,
+            to,
+            memo,
+        } => {
             let state = state_storage(deps.storage).load()?;
 
             if info.sender != state.lp {
-                return contract_error("only the lp can authorize asset exchange");
+                return contract_error("only the lp can authorize asset exchanges");
             }
 
-            let mut exchanges = asset_exchange_storage(deps.storage)
+            let mut authorizations = asset_exchange_authorization_storage(deps.storage)
                 .may_load()?
                 .unwrap_or_default();
-            exchanges.push(AssetExchangeAuthorization { exchange, to, memo });
-            asset_exchange_storage(deps.storage).save(&exchanges)?;
+            authorizations.push(AssetExchangeAuthorization {
+                exchanges,
+                to,
+                memo,
+            });
+            asset_exchange_authorization_storage(deps.storage).save(&authorizations)?;
 
             Ok(Response::default())
         }
-        HandleMsg::CancelAssetExchangeAuthorization { exchange, to, memo } => {
+        HandleMsg::CancelAssetExchangeAuthorization {
+            exchanges,
+            to,
+            memo,
+        } => {
             let state = state_storage(deps.storage).load()?;
 
             if info.sender != state.lp {
                 return contract_error("only the lp can cancel asset exchange authorization");
             }
 
-            remove_asset_exchange_authorization(deps.storage, exchange, to, memo)?;
+            remove_asset_exchange_authorization(deps.storage, exchanges, to, memo)?;
 
             Ok(Response::default())
         }
-        HandleMsg::CompleteAssetExchange { exchange, to, memo } => {
+        HandleMsg::CompleteAssetExchange {
+            exchanges,
+            to,
+            memo,
+        } => {
             let state = state_storage(deps.storage).load()?;
 
             if info.sender == state.admin {
                 remove_asset_exchange_authorization(
                     deps.storage,
-                    exchange.clone(),
+                    exchanges.clone(),
                     to.clone(),
                     memo.clone(),
                 )?;
@@ -78,35 +95,43 @@ pub fn execute(
             }
 
             let mut funds = Vec::new();
-            if let Some(investment) = exchange.investment {
-                if investment < 0 {
-                    funds.push(coin(
-                        investment.unsigned_abs().into(),
-                        state.investment_denom.clone(),
-                    ));
-                }
+
+            let total_investment: i64 = exchanges.iter().filter_map(|e| e.investment).sum();
+            if total_investment < 0 {
+                funds.push(coin(
+                    total_investment.unsigned_abs().into(),
+                    state.investment_denom.clone(),
+                ));
             }
-            if let Some(commitment) = exchange.commitment_in_shares {
-                if commitment < 0 {
-                    funds.push(coin(
-                        commitment.unsigned_abs().into(),
-                        state.commitment_denom.clone(),
-                    ));
-                }
+
+            let total_commitment: i64 = exchanges
+                .iter()
+                .filter_map(|e| e.commitment_in_shares)
+                .sum();
+            if total_commitment < 0 {
+                funds.push(coin(
+                    total_commitment.unsigned_abs().into(),
+                    state.commitment_denom.clone(),
+                ));
             }
-            if let Some(capital) = exchange.capital {
-                if capital < 0 {
-                    funds.push(coin(
-                        capital.unsigned_abs().into(),
-                        state.capital_denom.clone(),
-                    ));
-                }
+
+            let total_capital: i64 = exchanges.iter().filter_map(|e| e.capital).sum();
+            if total_capital < 0 {
+                funds.push(coin(
+                    total_capital.unsigned_abs().into(),
+                    state.capital_denom.clone(),
+                ));
             }
+
             funds.sort_by_key(|coin| coin.denom.clone());
 
             Ok(Response::new().add_message(wasm_execute(
                 state.raise,
-                &RaiseExecuteMsg::CompleteAssetExchange { exchange, to, memo },
+                &RaiseExecuteMsg::CompleteAssetExchange {
+                    exchanges,
+                    to,
+                    memo,
+                },
                 funds,
             )?))
         }
@@ -127,20 +152,24 @@ pub fn execute(
 
 fn remove_asset_exchange_authorization(
     storage: &mut dyn Storage,
-    exchange: AssetExchange,
+    exchanges: Vec<AssetExchange>,
     to: Option<Addr>,
     memo: Option<String>,
 ) -> Result<(), ContractError> {
-    let mut exchanges = asset_exchange_storage(storage).load()?;
+    let mut authorizations = asset_exchange_authorization_storage(storage).load()?;
 
-    let authorization = AssetExchangeAuthorization { exchange, to, memo };
-    let index = exchanges
+    let authorization = AssetExchangeAuthorization {
+        exchanges,
+        to,
+        memo,
+    };
+    let index = authorizations
         .iter()
         .position(|e| &authorization == e)
         .ok_or("no previously authorized asset exchange matched")?;
-    exchanges.remove(index);
+    authorizations.remove(index);
 
-    asset_exchange_storage(storage).save(&exchanges)?;
+    asset_exchange_authorization_storage(storage).save(&authorizations)?;
 
     Ok(())
 }
@@ -159,7 +188,7 @@ mod tests {
     use crate::mock::msg_at_index;
     use crate::mock::send_msg;
     use crate::msg::AssetExchange;
-    use crate::state::asset_exchange_storage_read;
+    use crate::state::asset_exchange_authorization_storage_read;
     use crate::state::State;
     use cosmwasm_std::testing::MockApi;
     use cosmwasm_std::testing::MockStorage;
@@ -217,12 +246,12 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::AuthorizeAssetExchange {
-                exchange: AssetExchange {
+                exchanges: vec![AssetExchange {
                     investment: Some(1_000),
                     commitment_in_shares: Some(1_000),
                     capital: Some(1_000),
                     date: None,
-                },
+                }],
                 to: Some(Addr::unchecked("lp_side_account")),
                 memo: Some(String::from("memo")),
             },
@@ -232,7 +261,7 @@ mod tests {
         // verify asset exchange authorization saved
         assert_eq!(
             1,
-            asset_exchange_storage_read(&deps.storage)
+            asset_exchange_authorization_storage_read(&deps.storage)
                 .load()
                 .unwrap()
                 .len()
@@ -248,12 +277,12 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::AuthorizeAssetExchange {
-                exchange: AssetExchange {
+                exchanges: vec![AssetExchange {
                     investment: Some(1_000),
                     commitment_in_shares: Some(1_000),
                     capital: Some(1_000),
                     date: None,
-                },
+                }],
                 to: Some(Addr::unchecked("lp_side_account")),
                 memo: Some(String::from("memo")),
             },
@@ -276,9 +305,9 @@ mod tests {
         let to = Some(Addr::unchecked("lp_side_account"));
         let memo = Some(String::from("memo"));
 
-        asset_exchange_storage(&mut deps.storage)
+        asset_exchange_authorization_storage(&mut deps.storage)
             .save(&vec![AssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             }])
@@ -289,7 +318,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::CancelAssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },
@@ -299,7 +328,7 @@ mod tests {
         // verify asset exchange authorization removed
         assert_eq!(
             0,
-            asset_exchange_storage_read(&deps.storage)
+            asset_exchange_authorization_storage_read(&deps.storage)
                 .load()
                 .unwrap()
                 .len()
@@ -319,9 +348,9 @@ mod tests {
         let to = Some(Addr::unchecked("lp_side_account"));
         let memo = Some(String::from("memo"));
 
-        asset_exchange_storage(&mut deps.storage)
+        asset_exchange_authorization_storage(&mut deps.storage)
             .save(&vec![AssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             }])
@@ -332,7 +361,7 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::CancelAssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },
@@ -359,7 +388,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },
@@ -372,7 +401,7 @@ mod tests {
         assert_eq!("raise_1", recipient);
         assert_eq!(
             RaiseExecuteMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to,
                 memo
             },
@@ -400,7 +429,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone(), exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },
@@ -413,7 +442,7 @@ mod tests {
         assert_eq!("raise_1", recipient);
         assert_eq!(
             RaiseExecuteMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone(), exchange.clone()],
                 to,
                 memo
             },
@@ -423,11 +452,11 @@ mod tests {
         // verify funds sent
         assert_eq!(3, funds.len());
         let capital = funds.get(0).unwrap();
-        assert_eq!(1_000, capital.amount.u128());
+        assert_eq!(2_000, capital.amount.u128());
         let commitment = funds.get(1).unwrap();
-        assert_eq!(1_000, commitment.amount.u128());
+        assert_eq!(2_000, commitment.amount.u128());
         let investment = funds.get(2).unwrap();
-        assert_eq!(1_000, investment.amount.u128());
+        assert_eq!(2_000, investment.amount.u128());
     }
 
     #[test]
@@ -443,9 +472,9 @@ mod tests {
         let to = Some(Addr::unchecked("lp_side_account"));
         let memo = Some(String::from("memo"));
 
-        asset_exchange_storage(&mut deps.storage)
+        asset_exchange_authorization_storage(&mut deps.storage)
             .save(&vec![AssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             }])
@@ -456,7 +485,7 @@ mod tests {
             mock_env(),
             mock_info("admin", &vec![]),
             HandleMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },
@@ -469,7 +498,7 @@ mod tests {
         assert_eq!("raise_1", recipient);
         assert_eq!(
             RaiseExecuteMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to,
                 memo
             },
@@ -482,7 +511,7 @@ mod tests {
         // verify asset exchange authorization removed
         assert_eq!(
             0,
-            asset_exchange_storage_read(&deps.storage)
+            asset_exchange_authorization_storage_read(&deps.storage)
                 .load()
                 .unwrap()
                 .len()
@@ -502,9 +531,9 @@ mod tests {
         let to = Some(Addr::unchecked("lp_side_account"));
         let memo = Some(String::from("memo"));
 
-        asset_exchange_storage(&mut deps.storage)
+        asset_exchange_authorization_storage(&mut deps.storage)
             .save(&vec![AssetExchangeAuthorization {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             }])
@@ -515,7 +544,7 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::CompleteAssetExchange {
-                exchange: exchange.clone(),
+                exchanges: vec![exchange.clone()],
                 to: to.clone(),
                 memo: memo.clone(),
             },

@@ -31,11 +31,14 @@
         "authorize_asset_exchange": {
           "type": "object",
           "required": [
-            "exchange"
+            "exchanges"
           ],
           "properties": {
-            "exchange": {
-              "$ref": "#/definitions/AssetExchange"
+            "exchanges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AssetExchange"
+              }
             },
             "memo": {
               "type": [
@@ -67,11 +70,14 @@
         "cancel_asset_exchange_authorization": {
           "type": "object",
           "required": [
-            "exchange"
+            "exchanges"
           ],
           "properties": {
-            "exchange": {
-              "$ref": "#/definitions/AssetExchange"
+            "exchanges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AssetExchange"
+              }
             },
             "memo": {
               "type": [
@@ -103,11 +109,14 @@
         "complete_asset_exchange": {
           "type": "object",
           "required": [
-            "exchange"
+            "exchanges"
           ],
           "properties": {
-            "exchange": {
-              "$ref": "#/definitions/AssetExchange"
+            "exchanges": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AssetExchange"
+              }
             },
             "memo": {
               "type": [

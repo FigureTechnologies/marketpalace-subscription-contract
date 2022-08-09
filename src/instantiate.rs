@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use crate::contract::ContractResponse;
 use crate::msg::AssetExchange;
 use crate::msg::InstantiateMsg;
-use crate::state::asset_exchange_storage;
+use crate::state::asset_exchange_authorization_storage;
 use crate::state::state_storage;
 use crate::state::AssetExchangeAuthorization;
 use crate::state::State;
@@ -39,16 +39,18 @@ pub fn instantiate(
     state_storage(deps.storage).save(&state)?;
 
     if let Some(commitment) = msg.initial_commitment {
-        asset_exchange_storage(deps.storage).save(&vec![AssetExchangeAuthorization {
-            exchange: AssetExchange {
-                investment: None,
-                commitment_in_shares: Some(commitment.try_into()?),
-                capital: None,
-                date: None,
+        asset_exchange_authorization_storage(deps.storage).save(&vec![
+            AssetExchangeAuthorization {
+                exchanges: vec![AssetExchange {
+                    investment: None,
+                    commitment_in_shares: Some(commitment.try_into()?),
+                    capital: None,
+                    date: None,
+                }],
+                to: None,
+                memo: None,
             },
-            to: None,
-            memo: None,
-        }])?;
+        ])?;
     }
 
     Ok(Response::default())
@@ -59,7 +61,7 @@ mod tests {
     use super::*;
     use crate::contract::query;
     use crate::msg::QueryMsg;
-    use crate::state::asset_exchange_storage_read;
+    use crate::state::asset_exchange_authorization_storage_read;
     use cosmwasm_std::from_binary;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_std::testing::mock_info;
@@ -96,7 +98,7 @@ mod tests {
         // verify authorized asset exchange for commitment
         assert_eq!(
             1,
-            asset_exchange_storage_read(&deps.storage)
+            asset_exchange_authorization_storage_read(&deps.storage)
                 .load()
                 .unwrap()
                 .len()
