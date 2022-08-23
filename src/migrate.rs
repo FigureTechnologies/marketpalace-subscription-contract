@@ -1,9 +1,13 @@
 use std::collections::HashSet;
+use std::convert::TryInto;
 use std::hash::Hash;
 
 use crate::error::ContractError;
+use crate::msg::AssetExchange;
 use crate::msg::MigrateMsg;
+use crate::state::asset_exchange_authorization_storage;
 use crate::state::state_storage;
+use crate::state::AssetExchangeAuthorization;
 use crate::state::State;
 use crate::state::CONFIG_KEY;
 use crate::version::CONTRACT_NAME;
@@ -41,6 +45,25 @@ pub fn migrate(
     };
 
     state_storage(deps.storage).save(&new_state)?;
+
+    if old_state.status == Status::Draft {
+        asset_exchange_authorization_storage(deps.storage).save(&vec![
+            AssetExchangeAuthorization {
+                exchanges: vec![AssetExchange {
+                    investment: None,
+                    commitment_in_shares: Some(
+                        new_state
+                            .capital_to_shares(old_state.max_commitment)
+                            .try_into()?,
+                    ),
+                    capital: None,
+                    date: None,
+                }],
+                to: None,
+                memo: None,
+            },
+        ])?;
+    }
 
     Ok(Response::default())
 }
@@ -160,6 +183,8 @@ impl Hash for Withdrawal {
 
 #[cfg(test)]
 mod tests {
+    use crate::state::asset_exchange_authorization_storage_read;
+
     use super::*;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_storage::singleton;
@@ -173,13 +198,13 @@ mod tests {
         singleton(&mut deps.storage, CONFIG_KEY)
             .save(&StateV1_0_0 {
                 recovery_admin: Addr::unchecked("marketpalace"),
-                status: Status::Accepted,
+                status: Status::Draft,
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 min_commitment: 0,
-                max_commitment: 0,
+                max_commitment: 10_000,
                 min_days_of_notice: None,
                 sequence: 0,
                 active_capital_call: None,
@@ -204,6 +229,24 @@ mod tests {
                 capital_per_share: 100,
             },
             singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
+        );
+
+        assert_eq!(
+            &AssetExchangeAuthorization {
+                exchanges: vec![AssetExchange {
+                    investment: None,
+                    commitment_in_shares: Some(100),
+                    capital: None,
+                    date: None,
+                }],
+                to: None,
+                memo: None,
+            },
+            asset_exchange_authorization_storage_read(&deps.storage)
+                .load()
+                .unwrap()
+                .get(0)
+                .unwrap()
         );
     }
 }
