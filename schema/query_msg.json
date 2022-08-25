@@ -13,6 +13,18 @@
         }
       },
       "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "required": [
+        "get_asset_exchange_authorizations"
+      ],
+      "properties": {
+        "get_asset_exchange_authorizations": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
     }
   ]
 }

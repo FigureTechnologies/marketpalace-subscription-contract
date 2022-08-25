@@ -76,4 +76,5 @@ pub enum ExchangeDate {
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
     GetState {},
+    GetAssetExchangeAuthorizations {},
 }

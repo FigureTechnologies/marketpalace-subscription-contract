@@ -11,8 +11,8 @@ use provwasm_std::ProvenanceQuery;
 use crate::error::ContractError;
 use crate::msg::{AssetExchange, HandleMsg, QueryMsg};
 use crate::state::{
-    asset_exchange_authorization_storage, state_storage, state_storage_read,
-    AssetExchangeAuthorization,
+    asset_exchange_authorization_storage, asset_exchange_authorization_storage_read, state_storage,
+    state_storage_read, AssetExchangeAuthorization,
 };
 
 pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
@@ -178,6 +178,9 @@ fn remove_asset_exchange_authorization(
 pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetState {} => to_binary(&state_storage_read(deps.storage).load()?),
+        QueryMsg::GetAssetExchangeAuthorizations {} => {
+            to_binary(&asset_exchange_authorization_storage_read(deps.storage).may_load()?)
+        }
     }
 }
 
