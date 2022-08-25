@@ -178,9 +178,11 @@ fn remove_asset_exchange_authorization(
 pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::GetState {} => to_binary(&state_storage_read(deps.storage).load()?),
-        QueryMsg::GetAssetExchangeAuthorizations {} => {
-            to_binary(&asset_exchange_authorization_storage_read(deps.storage).may_load()?)
-        }
+        QueryMsg::GetAssetExchangeAuthorizations {} => to_binary(
+            &asset_exchange_authorization_storage_read(deps.storage)
+                .may_load()?
+                .unwrap_or_default(),
+        ),
     }
 }
 
