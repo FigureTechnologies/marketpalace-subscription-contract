@@ -3,14 +3,17 @@
   "title": "InstantiateMsg",
   "type": "object",
   "required": [
+    "admin",
     "capital_denom",
     "capital_per_share",
-    "lp",
-    "max_commitment",
-    "min_commitment",
-    "recovery_admin"
+    "commitment_denom",
+    "investment_denom",
+    "lp"
   ],
   "properties": {
+    "admin": {
+      "$ref": "#/definitions/Addr"
+    },
     "capital_denom": {
       "type": "string"
     },
@@ -19,28 +22,21 @@
       "format": "uint64",
       "minimum": 0.0
     },
-    "lp": {
-      "$ref": "#/definitions/Addr"
+    "commitment_denom": {
+      "type": "string"
     },
-    "max_commitment": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "min_commitment": {
-      "type": "integer",
-      "format": "uint64",
-      "minimum": 0.0
-    },
-    "min_days_of_notice": {
+    "initial_commitment": {
       "type": [
         "integer",
         "null"
       ],
-      "format": "uint16",
+      "format": "uint64",
       "minimum": 0.0
     },
-    "recovery_admin": {
+    "investment_denom": {
+      "type": "string"
+    },
+    "lp": {
       "$ref": "#/definitions/Addr"
     }
   },

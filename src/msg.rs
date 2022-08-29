@@ -1,19 +1,17 @@
-use crate::state::{CapitalCall, Distribution, Redemption, Withdrawal};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 
 use cosmwasm_std::Addr;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 pub struct InstantiateMsg {
-    pub recovery_admin: Addr,
+    pub admin: Addr,
     pub lp: Addr,
+    pub commitment_denom: String,
+    pub investment_denom: String,
     pub capital_denom: String,
     pub capital_per_share: u64,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
-    pub min_days_of_notice: Option<u16>,
+    pub initial_commitment: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
@@ -26,21 +24,20 @@ pub enum HandleMsg {
     Recover {
         lp: Addr,
     },
-    Accept {},
-    IssueCapitalCall {
-        capital_call: CapitalCallIssuance,
+    AuthorizeAssetExchange {
+        exchanges: Vec<AssetExchange>,
+        to: Option<Addr>,
+        memo: Option<String>,
     },
-    CloseCapitalCall {
-        is_retroactive: bool,
+    CancelAssetExchangeAuthorization {
+        exchanges: Vec<AssetExchange>,
+        to: Option<Addr>,
+        memo: Option<String>,
     },
-    IssueRedemption {
-        redemption: u64,
-        payment: u64,
-        is_retroactive: bool,
-    },
-    IssueDistribution {
-        payment: u64,
-        is_retroactive: bool,
+    CompleteAssetExchange {
+        exchanges: Vec<AssetExchange>,
+        to: Option<Addr>,
+        memo: Option<String>,
     },
     IssueWithdrawal {
         to: Addr,
@@ -48,40 +45,36 @@ pub enum HandleMsg {
     },
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
-pub struct CapitalCallIssuance {
-    pub amount: u64,
-    pub days_of_notice: Option<u16>,
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub struct AssetExchange {
+    #[serde(rename = "inv")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub investment: Option<i64>,
+    #[serde(rename = "com")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub commitment_in_shares: Option<i64>,
+    #[serde(rename = "cap")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub capital: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub date: Option<ExchangeDate>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
+pub enum ExchangeDate {
+    #[serde(rename = "due")]
+    Due(u64),
+    #[serde(rename = "avl")]
+    Available(u64),
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum QueryMsg {
-    GetTerms {},
-    GetStatus {},
-    GetTransactions {},
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Terms {
-    pub lp: Addr,
-    pub raise: Addr,
-    pub capital_denom: String,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct CapitalCalls {
-    pub active: Option<CapitalCall>,
-    pub closed: HashSet<CapitalCall>,
-    pub cancelled: HashSet<CapitalCall>,
-}
-
-#[derive(Deserialize, Serialize)]
-pub struct Transactions {
-    pub capital_calls: CapitalCalls,
-    pub redemptions: HashSet<Redemption>,
-    pub distributions: HashSet<Distribution>,
-    pub withdrawals: HashSet<Withdrawal>,
+    GetState {},
+    GetAssetExchangeAuthorizations {},
 }

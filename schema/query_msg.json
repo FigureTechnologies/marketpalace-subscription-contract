@@ -5,10 +5,10 @@
     {
       "type": "object",
       "required": [
-        "get_terms"
+        "get_state"
       ],
       "properties": {
-        "get_terms": {
+        "get_state": {
           "type": "object"
         }
       },
@@ -17,22 +17,10 @@
     {
       "type": "object",
       "required": [
-        "get_status"
+        "get_asset_exchange_authorizations"
       ],
       "properties": {
-        "get_status": {
-          "type": "object"
-        }
-      },
-      "additionalProperties": false
-    },
-    {
-      "type": "object",
-      "required": [
-        "get_transactions"
-      ],
-      "properties": {
-        "get_transactions": {
+        "get_asset_exchange_authorizations": {
           "type": "object"
         }
       },
