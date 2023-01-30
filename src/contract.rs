@@ -72,7 +72,7 @@ pub fn execute(
                 return contract_error("only the lp can cancel asset exchange authorization");
             }
 
-            remove_asset_exchange_authorization(deps.storage, exchanges, to, memo)?;
+            remove_asset_exchange_authorization(deps.storage, exchanges, to, memo, true)?;
 
             Ok(Response::default())
         }
@@ -83,16 +83,17 @@ pub fn execute(
         } => {
             let state = state_storage(deps.storage).load()?;
 
-            if info.sender == state.admin {
-                remove_asset_exchange_authorization(
-                    deps.storage,
-                    exchanges.clone(),
-                    to.clone(),
-                    memo.clone(),
-                )?;
-            } else if info.sender != state.lp {
+            if info.sender != state.lp && info.sender != state.admin {
                 return contract_error("only the lp or admin can complete asset exchange");
             }
+
+            remove_asset_exchange_authorization(
+                deps.storage,
+                exchanges.clone(),
+                to.clone(),
+                memo.clone(),
+                info.sender == state.admin,
+            )?;
 
             let mut funds = Vec::new();
 
@@ -155,21 +156,38 @@ fn remove_asset_exchange_authorization(
     exchanges: Vec<AssetExchange>,
     to: Option<Addr>,
     memo: Option<String>,
+    authorization_required: bool,
 ) -> Result<(), ContractError> {
-    let mut authorizations = asset_exchange_authorization_storage(storage).load()?;
-
-    let authorization = AssetExchangeAuthorization {
-        exchanges,
-        to,
-        memo,
-    };
-    let index = authorizations
-        .iter()
-        .position(|e| &authorization == e)
-        .ok_or("no previously authorized asset exchange matched")?;
-    authorizations.remove(index);
-
-    asset_exchange_authorization_storage(storage).save(&authorizations)?;
+    match asset_exchange_authorization_storage(storage).may_load()? {
+        Some(mut authorizations) => {
+            let authorization = AssetExchangeAuthorization {
+                exchanges,
+                to,
+                memo,
+            };
+            let index = authorizations.iter().position(|e| &authorization == e);
+            match index {
+                Some(index) => {
+                    authorizations.remove(index);
+                    asset_exchange_authorization_storage(storage).save(&authorizations)?;
+                }
+                None => {
+                    if authorization_required {
+                        return Err(ContractError::from(
+                            "no previously authorized asset exchange matched",
+                        ));
+                    }
+                }
+            }
+        }
+        None => {
+            if authorization_required {
+                return Err(ContractError::from(
+                    "no previously authorized asset exchange matched",
+                ));
+            }
+        }
+    }
 
     Ok(())
 }
