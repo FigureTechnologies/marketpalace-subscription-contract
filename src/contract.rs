@@ -5,10 +5,11 @@ use cosmwasm_std::{
     coins, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdResult,
 };
+use provwasm_std::ProvenanceMsg;
 use provwasm_std::ProvenanceQuery;
-use provwasm_std::{transfer_marker_coins, MarkerType, ProvenanceMsg, ProvenanceQuerier};
 
 use crate::error::ContractError;
+use crate::fiat_deposit_msg::FiatDepositExecuteMsg;
 use crate::msg::{AssetExchange, HandleMsg, QueryMsg};
 use crate::state::{
     asset_exchange_authorization_storage, asset_exchange_authorization_storage_read, state_storage,
@@ -116,23 +117,26 @@ pub fn execute(
             }
 
             let mut response = Response::new();
-            let capital_marker =
-                ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(&state.capital_denom)?;
             let total_capital: i64 = exchanges.iter().filter_map(|e| e.capital).sum();
             if total_capital < 0 {
-                if capital_marker.marker_type == MarkerType::Coin {
-                    funds.push(coin(
-                        total_capital.unsigned_abs().into(),
-                        state.capital_denom.clone(),
-                    ));
-                } else {
-                    let marker_transfer = transfer_marker_coins(
-                        total_capital.unsigned_abs().into(),
-                        &state.capital_denom,
-                        state.raise.clone(),
-                        _env.contract.address,
-                    )?;
-                    response = response.add_message(marker_transfer);
+                match state.fiat_deposit_addr {
+                    Some(fiat_deposit_addr) => {
+                        let fiat_deposit_transfer = wasm_execute(
+                            fiat_deposit_addr.into_string(),
+                            &FiatDepositExecuteMsg::Transfer {
+                                amount: total_capital.unsigned_abs().into(),
+                                recipient: state.raise.clone().into(),
+                            },
+                            vec![],
+                        )?;
+                        response = response.add_message(fiat_deposit_transfer)
+                    }
+                    None => {
+                        funds.push(coin(
+                            total_capital.unsigned_abs().into(),
+                            state.capital_denom.clone(),
+                        ));
+                    }
                 };
             }
 
@@ -155,22 +159,25 @@ pub fn execute(
                 return contract_error("only the lp can withdraw");
             }
 
-            let capital_marker =
-                ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(&state.capital_denom)?;
-            let response = if capital_marker.marker_type == MarkerType::Coin {
-                let send_capital = BankMsg::Send {
-                    to_address: to.to_string(),
-                    amount: coins(amount.into(), state.capital_denom),
-                };
-                Response::new().add_message(send_capital)
-            } else {
-                let marker_transfer = transfer_marker_coins(
-                    amount.into(),
-                    &state.capital_denom,
-                    to,
-                    _env.contract.address,
-                )?;
-                Response::new().add_message(marker_transfer)
+            let response = match state.fiat_deposit_addr {
+                Some(fiat_deposit_addr) => {
+                    let fiat_deposit_transfer = wasm_execute(
+                        fiat_deposit_addr.into_string(),
+                        &FiatDepositExecuteMsg::Transfer {
+                            amount: amount.into(),
+                            recipient: to.into_string(),
+                        },
+                        vec![],
+                    )?;
+                    Response::new().add_message(fiat_deposit_transfer)
+                }
+                None => {
+                    let send_capital = BankMsg::Send {
+                        to_address: to.to_string(),
+                        amount: coins(amount.into(), state.capital_denom),
+                    };
+                    Response::new().add_message(send_capital)
+                }
             };
             Ok(response)
         }
@@ -216,19 +223,18 @@ pub fn query(deps: Deps<ProvenanceQuery>, _env: Env, msg: QueryMsg) -> StdResult
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mock::msg_at_index;
     use crate::mock::send_msg;
     use crate::mock::{execute_args, load_markers};
-    use crate::mock::{marker_transfer_msg, msg_at_index};
     use crate::msg::AssetExchange;
     use crate::state::asset_exchange_authorization_storage_read;
     use crate::state::State;
+    use cosmwasm_std::testing::MockApi;
     use cosmwasm_std::testing::MockStorage;
     use cosmwasm_std::testing::{mock_env, mock_info};
-    use cosmwasm_std::testing::{MockApi, MOCK_CONTRACT_ADDR};
-    use cosmwasm_std::Addr;
     use cosmwasm_std::OwnedDeps;
+    use cosmwasm_std::{Addr, Uint128};
     use provwasm_mocks::{mock_dependencies, ProvenanceMockQuerier};
-    use provwasm_std::MarkerMsgParams;
 
     pub fn default_deps(
         update_state: Option<fn(&mut State)>,
@@ -258,12 +264,12 @@ mod tests {
         deps
     }
 
-    pub fn restricted_capital_coin_deps(
+    pub fn restricted_fiat_deposit_coin_deps(
         update_state: Option<fn(&mut State)>,
     ) -> OwnedDeps<MockStorage, MockApi, ProvenanceMockQuerier, ProvenanceQuery> {
         let mut deps = mock_dependencies(&[]);
 
-        let mut state = State::test_restricted_capital_coin();
+        let mut state = State::test_fiat_deposit_capital_coin();
         if let Some(update) = update_state {
             update(&mut state);
         }
@@ -521,8 +527,8 @@ mod tests {
     }
 
     #[test]
-    fn complete_asset_exchange_restricted_marker_send_only() {
-        let mut deps = restricted_capital_coin_deps(None);
+    fn complete_asset_exchange_fiat_deposit_send_only() {
+        let mut deps = restricted_fiat_deposit_coin_deps(None);
         load_markers(&mut deps.querier);
         let exchange = AssetExchange {
             investment: Some(-1_000),
@@ -544,6 +550,18 @@ mod tests {
         )
         .unwrap();
 
+        // verify capital was transferred
+        let (_recipient, msg, fiat_deposit_funds) =
+            execute_args::<FiatDepositExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!(
+            FiatDepositExecuteMsg::Transfer {
+                amount: Uint128::from(2_000 as u128),
+                recipient: "raise_1".into(),
+            },
+            msg
+        );
+        assert_eq!(0, fiat_deposit_funds.len());
+
         // verify exec message sent
         assert_eq!(2, res.messages.len());
         let (recipient, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 1));
@@ -557,18 +575,7 @@ mod tests {
             msg
         );
 
-        // verify funds sent
-        assert_eq!(
-            &MarkerMsgParams::TransferMarkerCoins {
-                coin: coin(2_000, "restricted_capital_coin"),
-                to: Addr::unchecked("raise_1"),
-                from: Addr::unchecked(MOCK_CONTRACT_ADDR),
-            },
-            marker_transfer_msg(msg_at_index(&res, 0)),
-        );
         assert_eq!(2, funds.len());
-        // let capital = funds.get(0).unwrap();
-        // assert_eq!(2_000, capital.amount.u128());
         let commitment = funds.get(0).unwrap();
         assert_eq!(2_000, commitment.amount.u128());
         let investment = funds.get(1).unwrap();
@@ -693,8 +700,8 @@ mod tests {
     }
 
     #[test]
-    fn withdraw_restricted_marker() {
-        let mut deps = restricted_capital_coin_deps(None);
+    fn withdraw_fiat_deposit_marker() {
+        let mut deps = restricted_fiat_deposit_coin_deps(None);
         load_markers(&mut deps.querier);
         let res = execute(
             deps.as_mut(),
@@ -709,14 +716,17 @@ mod tests {
 
         // verify send message sent
         assert_eq!(1, res.messages.len());
+        // verify capital was transferred
+        let (_recipient, msg, fiat_deposit_funds) =
+            execute_args::<FiatDepositExecuteMsg>(msg_at_index(&res, 0));
         assert_eq!(
-            &MarkerMsgParams::TransferMarkerCoins {
-                coin: coin(10_000, "restricted_capital_coin"),
-                to: Addr::unchecked("lp_side_account"),
-                from: Addr::unchecked(MOCK_CONTRACT_ADDR),
+            FiatDepositExecuteMsg::Transfer {
+                amount: Uint128::from(10_000 as u128),
+                recipient: "lp_side_account".into(),
             },
-            marker_transfer_msg(msg_at_index(&res, 0)),
+            msg
         );
+        assert_eq!(0, fiat_deposit_funds.len());
     }
 
     #[test]
