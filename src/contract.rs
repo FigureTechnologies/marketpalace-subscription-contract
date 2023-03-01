@@ -116,9 +116,9 @@ pub fn execute(
                 ));
             }
 
-            let mut response = Response::new();
+            let response = Response::new();
             let total_capital: i64 = exchanges.iter().filter_map(|e| e.capital).sum();
-            if total_capital < 0 {
+            let response = if total_capital < 0 {
                 match state.fiat_deposit_addr {
                     Some(fiat_deposit_addr) => {
                         let fiat_deposit_transfer = wasm_execute(
@@ -129,16 +129,19 @@ pub fn execute(
                             },
                             vec![],
                         )?;
-                        response = response.add_message(fiat_deposit_transfer)
+                        response.add_message(fiat_deposit_transfer)
                     }
                     None => {
                         funds.push(coin(
                             total_capital.unsigned_abs().into(),
                             state.capital_denom.clone(),
                         ));
+                        response
                     }
-                };
-            }
+                }
+            } else {
+                response
+            };
 
             funds.sort_by_key(|coin| coin.denom.clone());
 
