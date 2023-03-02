@@ -25,16 +25,6 @@
     "commitment_denom": {
       "type": "string"
     },
-    "fiat_deposit_addr": {
-      "anyOf": [
-        {
-          "$ref": "#/definitions/Addr"
-        },
-        {
-          "type": "null"
-        }
-      ]
-    },
     "initial_commitment": {
       "type": [
         "integer",

@@ -34,7 +34,6 @@ pub fn instantiate(
         investment_denom: msg.investment_denom,
         capital_denom: msg.capital_denom,
         capital_per_share: msg.capital_per_share,
-        fiat_deposit_addr: msg.fiat_deposit_addr,
     };
 
     state_storage(deps.storage).save(&state)?;
@@ -86,7 +85,6 @@ mod tests {
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 initial_commitment: Some(100),
-                fiat_deposit_addr: None,
             },
         )
         .unwrap();
