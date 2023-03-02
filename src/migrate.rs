@@ -42,6 +42,7 @@ pub fn migrate(
         investment_denom: format!("{}.investment", old_state.raise),
         capital_denom: old_state.capital_denom,
         capital_per_share: old_state.capital_per_share,
+        required_capital_attribute: None,
     };
 
     state_storage(deps.storage).save(&new_state)?;
@@ -227,6 +228,7 @@ mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: None,
             },
             singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
         );
