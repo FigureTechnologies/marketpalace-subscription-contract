@@ -127,19 +127,7 @@ pub fn execute(
                         ));
                         response
                     }
-                    Some(required_capital_attribute) => {
-                        if !query_attributes(deps, &state.raise)
-                            .any(|attr| attr.name == required_capital_attribute)
-                        {
-                            return contract_error(
-                                format!(
-                                    "{} does not have required attribute of {}",
-                                    &state.raise, &required_capital_attribute
-                                )
-                                .as_str(),
-                            );
-                        }
-
+                    Some(_required_capital_attribute) => {
                         let marker_transfer = transfer_marker_coins(
                             total_capital.unsigned_abs().into(),
                             &state.capital_denom,
