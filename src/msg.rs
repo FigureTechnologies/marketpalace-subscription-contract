@@ -12,6 +12,7 @@ pub struct InstantiateMsg {
     pub capital_denom: String,
     pub capital_per_share: u64,
     pub initial_commitment: Option<u64>,
+    pub required_capital_attribute: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]

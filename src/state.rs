@@ -18,6 +18,7 @@ pub struct State {
     pub investment_denom: String,
     pub capital_denom: String,
     pub capital_per_share: u64,
+    pub required_capital_attribute: Option<String>,
 }
 
 impl State {
@@ -71,6 +72,7 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: None,
             }
         }
 
@@ -83,6 +85,7 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("capital_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: None,
             }
         }
 
@@ -95,6 +98,7 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 capital_denom: String::from("restricted_capital_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: Some(String::from("capital.test")),
             }
         }
     }

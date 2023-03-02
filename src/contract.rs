@@ -5,8 +5,9 @@ use cosmwasm_std::{
     coins, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdResult,
 };
-use provwasm_std::ProvenanceQuery;
-use provwasm_std::{transfer_marker_coins, MarkerType, ProvenanceMsg, ProvenanceQuerier};
+use provwasm_std::{transfer_marker_coins, ProvenanceMsg};
+use provwasm_std::{ProvenanceQuerier, ProvenanceQuery};
+use std::vec::IntoIter;
 
 use crate::error::ContractError;
 use crate::msg::{AssetExchange, HandleMsg, QueryMsg};
@@ -115,26 +116,42 @@ pub fn execute(
                 ));
             }
 
-            let mut response = Response::new();
-            let capital_marker =
-                ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(&state.capital_denom)?;
+            let response = Response::new();
             let total_capital: i64 = exchanges.iter().filter_map(|e| e.capital).sum();
-            if total_capital < 0 {
-                if capital_marker.marker_type == MarkerType::Coin {
-                    funds.push(coin(
-                        total_capital.unsigned_abs().into(),
-                        state.capital_denom.clone(),
-                    ));
-                } else {
-                    let marker_transfer = transfer_marker_coins(
-                        total_capital.unsigned_abs().into(),
-                        &state.capital_denom,
-                        state.raise.clone(),
-                        _env.contract.address,
-                    )?;
-                    response = response.add_message(marker_transfer);
-                };
-            }
+            let response = if total_capital < 0 {
+                match state.required_capital_attribute {
+                    None => {
+                        funds.push(coin(
+                            total_capital.unsigned_abs().into(),
+                            state.capital_denom.clone(),
+                        ));
+                        response
+                    }
+                    Some(required_capital_attribute) => {
+                        if !query_attributes(deps, &state.raise)
+                            .any(|attr| attr.name == required_capital_attribute)
+                        {
+                            return contract_error(
+                                format!(
+                                    "{} does not have required attribute of {}",
+                                    &state.raise, &required_capital_attribute
+                                )
+                                .as_str(),
+                            );
+                        }
+
+                        let marker_transfer = transfer_marker_coins(
+                            total_capital.unsigned_abs().into(),
+                            &state.capital_denom,
+                            state.raise.clone(),
+                            _env.contract.address,
+                        )?;
+                        response.add_message(marker_transfer)
+                    }
+                }
+            } else {
+                response
+            };
 
             funds.sort_by_key(|coin| coin.denom.clone());
 
@@ -155,26 +172,50 @@ pub fn execute(
                 return contract_error("only the lp can withdraw");
             }
 
-            let capital_marker =
-                ProvenanceQuerier::new(&deps.querier).get_marker_by_denom(&state.capital_denom)?;
-            let response = if capital_marker.marker_type == MarkerType::Coin {
-                let send_capital = BankMsg::Send {
-                    to_address: to.to_string(),
-                    amount: coins(amount.into(), state.capital_denom),
-                };
-                Response::new().add_message(send_capital)
-            } else {
-                let marker_transfer = transfer_marker_coins(
-                    amount.into(),
-                    &state.capital_denom,
-                    to,
-                    _env.contract.address,
-                )?;
-                Response::new().add_message(marker_transfer)
+            let response = match state.required_capital_attribute {
+                None => {
+                    let send_capital = BankMsg::Send {
+                        to_address: to.to_string(),
+                        amount: coins(amount.into(), state.capital_denom),
+                    };
+                    Response::new().add_message(send_capital)
+                }
+                Some(required_capital_attribute) => {
+                    if !query_attributes(deps, &to)
+                        .any(|attr| attr.name == required_capital_attribute)
+                    {
+                        return contract_error(
+                            format!(
+                                "{} does not have required attribute of {}",
+                                &to, &required_capital_attribute
+                            )
+                            .as_str(),
+                        );
+                    }
+
+                    let marker_transfer = transfer_marker_coins(
+                        amount.into(),
+                        &state.capital_denom,
+                        to,
+                        _env.contract.address,
+                    )?;
+                    Response::new().add_message(marker_transfer)
+                }
             };
             Ok(response)
         }
     }
+}
+
+fn query_attributes(
+    deps: DepsMut<ProvenanceQuery>,
+    address: &Addr,
+) -> IntoIter<provwasm_std::Attribute> {
+    ProvenanceQuerier::new(&deps.querier)
+        .get_attributes(address.clone(), None as Option<String>)
+        .unwrap()
+        .attributes
+        .into_iter()
 }
 
 fn remove_asset_exchange_authorization(
@@ -523,6 +564,8 @@ mod tests {
     #[test]
     fn complete_asset_exchange_restricted_marker_send_only() {
         let mut deps = restricted_capital_coin_deps(None);
+        deps.querier
+            .with_attributes("raise_1", &[("capital.test", "", "")]);
         load_markers(&mut deps.querier);
         let exchange = AssetExchange {
             investment: Some(-1_000),
@@ -695,6 +738,8 @@ mod tests {
     #[test]
     fn withdraw_restricted_marker() {
         let mut deps = restricted_capital_coin_deps(None);
+        deps.querier
+            .with_attributes("lp_side_account", &[("capital.test", "", "")]);
         load_markers(&mut deps.querier);
         let res = execute(
             deps.as_mut(),
