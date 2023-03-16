@@ -44,6 +44,9 @@ pub enum HandleMsg {
         to: Addr,
         amount: u64,
     },
+    UpdateCapitalDenomination {
+        capital_denomination: String,
+    },
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
