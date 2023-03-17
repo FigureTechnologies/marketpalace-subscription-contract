@@ -155,36 +155,25 @@ impl Hash for Withdrawal {
 
 #[cfg(test)]
 mod tests {
-    use crate::state::asset_exchange_authorization_storage_read;
-
     use super::*;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_storage::singleton;
     use provwasm_mocks::mock_dependencies;
 
-    use super::StateV1_0_0;
+    use super::StateV2_0_0;
 
     #[test]
     fn migration() {
         let mut deps = mock_dependencies(&[]);
         singleton(&mut deps.storage, CONFIG_KEY)
-            .save(&StateV1_0_0 {
-                recovery_admin: Addr::unchecked("marketpalace"),
-                status: Status::Draft,
+            .save(&StateV2_0_0 {
+                admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
+                commitment_denom: "commitment".to_string(),
+                investment_denom: "investment".to_string(),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
-                min_commitment: 0,
-                max_commitment: 10_000,
-                min_days_of_notice: None,
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -203,31 +192,13 @@ mod tests {
                 admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
-                commitment_denom: String::from("raise_1.commitment"),
-                investment_denom: String::from("raise_1.investment"),
+                commitment_denom: String::from("commitment"),
+                investment_denom: String::from("investment"),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 required_capital_attribute: None,
             },
             singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
-        );
-
-        assert_eq!(
-            &AssetExchangeAuthorization {
-                exchanges: vec![AssetExchange {
-                    investment: None,
-                    commitment_in_shares: Some(100),
-                    capital: None,
-                    date: None,
-                }],
-                to: None,
-                memo: None,
-            },
-            asset_exchange_authorization_storage_read(&deps.storage)
-                .load()
-                .unwrap()
-                .get(0)
-                .unwrap()
         );
     }
 
@@ -235,23 +206,14 @@ mod tests {
     fn migration_with_capital_denom_and_attribute() {
         let mut deps = mock_dependencies(&[]);
         singleton(&mut deps.storage, CONFIG_KEY)
-            .save(&StateV1_0_0 {
-                recovery_admin: Addr::unchecked("marketpalace"),
-                status: Status::Draft,
+            .save(&StateV2_0_0 {
+                admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
+                commitment_denom: "commitment".to_string(),
+                investment_denom: "investment".to_string(),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
-                min_commitment: 0,
-                max_commitment: 10_000,
-                min_days_of_notice: None,
-                sequence: 0,
-                active_capital_call: None,
-                closed_capital_calls: HashSet::new(),
-                cancelled_capital_calls: HashSet::new(),
-                redemptions: HashSet::new(),
-                distributions: HashSet::new(),
-                withdrawals: HashSet::new(),
             })
             .unwrap();
 
@@ -266,8 +228,8 @@ mod tests {
                 admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
-                commitment_denom: String::from("raise_1.commitment"),
-                investment_denom: String::from("raise_1.investment"),
+                commitment_denom: String::from("commitment"),
+                investment_denom: String::from("investment"),
                 capital_denom: String::from("new_denom"),
                 capital_per_share: 100,
                 required_capital_attribute: Some(String::from("attr")),
