@@ -207,6 +207,21 @@ pub fn execute(
 
             Ok(Response::new())
         }
+        HandleMsg::UpdateRequiredCapitalAttribute {
+            required_capital_attribute,
+        } => {
+            let mut state = state_storage_read(deps.storage).load()?;
+
+            if info.sender != state.admin {
+                return contract_error("only the admin can update required capital attribute");
+            }
+
+            state.required_capital_attribute = Some(required_capital_attribute);
+
+            state_storage(deps.storage).save(&state)?;
+
+            Ok(Response::new())
+        }
     }
 }
 
@@ -800,5 +815,27 @@ mod tests {
         // verify that denom has been updated
         let state = state_storage_read(&deps.storage).load().unwrap();
         assert_eq!(String::from("new_denom"), state.capital_denom);
+    }
+
+    #[test]
+    fn update_required_capital_attribute() {
+        let mut deps = default_deps(None);
+
+        execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("admin", &vec![]),
+            HandleMsg::UpdateRequiredCapitalAttribute {
+                required_capital_attribute: String::from("required_attr"),
+            },
+        )
+        .unwrap();
+
+        // verify that denom has been updated
+        let state = state_storage_read(&deps.storage).load().unwrap();
+        assert_eq!(
+            Some(String::from("required_attr")),
+            state.required_capital_attribute
+        );
     }
 }

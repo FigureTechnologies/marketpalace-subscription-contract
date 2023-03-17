@@ -47,6 +47,9 @@ pub enum HandleMsg {
     UpdateCapitalDenomination {
         capital_denomination: String,
     },
+    UpdateRequiredCapitalAttribute {
+        required_capital_attribute: String,
+    },
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]
