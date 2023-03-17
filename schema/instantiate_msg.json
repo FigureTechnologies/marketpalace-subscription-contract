@@ -38,6 +38,12 @@
     },
     "lp": {
       "$ref": "#/definitions/Addr"
+    },
+    "required_capital_attribute": {
+      "type": [
+        "string",
+        "null"
+      ]
     }
   },
   "definitions": {
