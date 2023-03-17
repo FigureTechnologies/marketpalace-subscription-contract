@@ -28,21 +28,25 @@ use serde::Serialize;
 pub fn migrate(
     deps: DepsMut<ProvenanceQuery>,
     _: Env,
-    _: MigrateMsg,
+    migrate_msg: MigrateMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let old_state: StateV1_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
 
+    let capital_denom = match migrate_msg.capital_denom {
+        None => old_state.capital_denom,
+        Some(capital_denom) => capital_denom,
+    };
     let new_state = State {
         admin: old_state.recovery_admin,
         lp: old_state.lp,
         raise: old_state.raise.clone(),
         commitment_denom: format!("{}.commitment", old_state.raise),
         investment_denom: format!("{}.investment", old_state.raise),
-        capital_denom: old_state.capital_denom,
+        capital_denom,
         capital_per_share: old_state.capital_per_share,
-        required_capital_attribute: None,
+        required_capital_attribute: migrate_msg.required_capital_attribute,
     };
 
     state_storage(deps.storage).save(&new_state)?;
