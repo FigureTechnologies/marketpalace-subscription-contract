@@ -47,12 +47,6 @@ pub enum HandleMsg {
         to: Addr,
         amount: u64,
     },
-    UpdateCapitalDenomination {
-        capital_denomination: String,
-    },
-    UpdateRequiredCapitalAttribute {
-        required_capital_attribute: String,
-    },
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq, JsonSchema)]

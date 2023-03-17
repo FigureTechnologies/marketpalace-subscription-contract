@@ -221,7 +221,15 @@ mod tests {
             })
             .unwrap();
 
-        migrate(deps.as_mut(), mock_env(), MigrateMsg {}).unwrap();
+        migrate(
+            deps.as_mut(),
+            mock_env(),
+            MigrateMsg {
+                capital_denom: None,
+                required_capital_attribute: None,
+            },
+        )
+        .unwrap();
 
         assert_eq!(
             State {
@@ -253,6 +261,51 @@ mod tests {
                 .unwrap()
                 .get(0)
                 .unwrap()
+        );
+    }
+
+    #[test]
+    fn migration_with_capital_denom_and_attribute() {
+        let mut deps = mock_dependencies(&[]);
+        singleton(&mut deps.storage, CONFIG_KEY)
+            .save(&StateV1_0_0 {
+                recovery_admin: Addr::unchecked("marketpalace"),
+                status: Status::Draft,
+                lp: Addr::unchecked("lp"),
+                raise: Addr::unchecked("raise_1"),
+                capital_denom: String::from("stable_coin"),
+                capital_per_share: 100,
+                min_commitment: 0,
+                max_commitment: 10_000,
+                min_days_of_notice: None,
+                sequence: 0,
+                active_capital_call: None,
+                closed_capital_calls: HashSet::new(),
+                cancelled_capital_calls: HashSet::new(),
+                redemptions: HashSet::new(),
+                distributions: HashSet::new(),
+                withdrawals: HashSet::new(),
+            })
+            .unwrap();
+
+        let migration_msg = MigrateMsg {
+            capital_denom: Some(String::from("new_denom")),
+            required_capital_attribute: Some(String::from("attr")),
+        };
+        migrate(deps.as_mut(), mock_env(), migration_msg).unwrap();
+
+        assert_eq!(
+            State {
+                admin: Addr::unchecked("marketpalace"),
+                lp: Addr::unchecked("lp"),
+                raise: Addr::unchecked("raise_1"),
+                commitment_denom: String::from("raise_1.commitment"),
+                investment_denom: String::from("raise_1.investment"),
+                capital_denom: String::from("new_denom"),
+                capital_per_share: 100,
+                required_capital_attribute: Some(String::from("attr")),
+            },
+            singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
         );
     }
 }
