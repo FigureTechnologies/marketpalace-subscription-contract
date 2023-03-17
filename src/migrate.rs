@@ -1,13 +1,8 @@
-use std::collections::HashSet;
-use std::convert::TryInto;
 use std::hash::Hash;
 
 use crate::error::ContractError;
-use crate::msg::AssetExchange;
 use crate::msg::MigrateMsg;
-use crate::state::asset_exchange_authorization_storage;
 use crate::state::state_storage;
-use crate::state::AssetExchangeAuthorization;
 use crate::state::State;
 use crate::state::CONFIG_KEY;
 use crate::version::CONTRACT_NAME;
@@ -32,18 +27,18 @@ pub fn migrate(
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let old_state: StateV1_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
+    let old_state: StateV2_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
 
     let capital_denom = match migrate_msg.capital_denom {
         None => old_state.capital_denom,
         Some(capital_denom) => capital_denom,
     };
     let new_state = State {
-        admin: old_state.recovery_admin,
+        admin: old_state.admin,
         lp: old_state.lp,
         raise: old_state.raise.clone(),
-        commitment_denom: format!("{}.commitment", old_state.raise),
-        investment_denom: format!("{}.investment", old_state.raise),
+        commitment_denom: old_state.commitment_denom,
+        investment_denom: old_state.investment_denom,
         capital_denom,
         capital_per_share: old_state.capital_per_share,
         required_capital_attribute: migrate_msg.required_capital_attribute,
@@ -51,46 +46,18 @@ pub fn migrate(
 
     state_storage(deps.storage).save(&new_state)?;
 
-    if old_state.status == Status::Draft {
-        asset_exchange_authorization_storage(deps.storage).save(&vec![
-            AssetExchangeAuthorization {
-                exchanges: vec![AssetExchange {
-                    investment: None,
-                    commitment_in_shares: Some(
-                        new_state
-                            .capital_to_shares(old_state.max_commitment)
-                            .try_into()?,
-                    ),
-                    capital: None,
-                    date: None,
-                }],
-                to: None,
-                memo: None,
-            },
-        ])?;
-    }
-
     Ok(Response::default())
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct StateV1_0_0 {
-    pub recovery_admin: Addr,
+pub struct StateV2_0_0 {
+    pub admin: Addr,
     pub lp: Addr,
-    pub status: Status,
     pub raise: Addr,
+    pub commitment_denom: String,
+    pub investment_denom: String,
     pub capital_denom: String,
     pub capital_per_share: u64,
-    pub min_commitment: u64,
-    pub max_commitment: u64,
-    pub min_days_of_notice: Option<u16>,
-    pub sequence: u16,
-    pub active_capital_call: Option<CapitalCall>,
-    pub closed_capital_calls: HashSet<CapitalCall>,
-    pub cancelled_capital_calls: HashSet<CapitalCall>,
-    pub redemptions: HashSet<Redemption>,
-    pub distributions: HashSet<Distribution>,
-    pub withdrawals: HashSet<Withdrawal>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
