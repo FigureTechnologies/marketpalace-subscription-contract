@@ -29,17 +29,13 @@ pub fn migrate(
 
     let old_state: StateV2_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
 
-    let capital_denom = match migrate_msg.capital_denom {
-        None => old_state.capital_denom,
-        Some(capital_denom) => capital_denom,
-    };
     let new_state = State {
         admin: old_state.admin,
         lp: old_state.lp,
         raise: old_state.raise.clone(),
         commitment_denom: old_state.commitment_denom,
         investment_denom: old_state.investment_denom,
-        capital_denom,
+        like_capital_denoms: migrate_msg.like_capital_denoms,
         capital_per_share: old_state.capital_per_share,
         required_capital_attribute: migrate_msg.required_capital_attribute,
     };
@@ -58,6 +54,18 @@ pub struct StateV2_0_0 {
     pub investment_denom: String,
     pub capital_denom: String,
     pub capital_per_share: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct StateV2_2_0 {
+    pub admin: Addr,
+    pub lp: Addr,
+    pub raise: Addr,
+    pub commitment_denom: String,
+    pub investment_denom: String,
+    pub capital_denom: String,
+    pub capital_per_share: u64,
+    pub required_capital_attribute: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -181,7 +189,7 @@ mod tests {
             deps.as_mut(),
             mock_env(),
             MigrateMsg {
-                capital_denom: None,
+                like_capital_denoms: vec![String::from("stable_coin")],
                 required_capital_attribute: None,
             },
         )
@@ -194,7 +202,7 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("commitment"),
                 investment_denom: String::from("investment"),
-                capital_denom: String::from("stable_coin"),
+                like_capital_denoms: vec![String::from("stable_coin")],
                 capital_per_share: 100,
                 required_capital_attribute: None,
             },
@@ -218,7 +226,7 @@ mod tests {
             .unwrap();
 
         let migration_msg = MigrateMsg {
-            capital_denom: Some(String::from("new_denom")),
+            like_capital_denoms: vec![String::from("new_denom")],
             required_capital_attribute: Some(String::from("attr")),
         };
         migrate(deps.as_mut(), mock_env(), migration_msg).unwrap();
@@ -230,7 +238,7 @@ mod tests {
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("commitment"),
                 investment_denom: String::from("investment"),
-                capital_denom: String::from("new_denom"),
+                like_capital_denoms: vec![String::from("new_denom")],
                 capital_per_share: 100,
                 required_capital_attribute: Some(String::from("attr")),
             },
