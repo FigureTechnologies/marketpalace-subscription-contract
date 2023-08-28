@@ -149,6 +149,7 @@
           "type": "object",
           "required": [
             "amount",
+            "capital_denom",
             "to"
           ],
           "properties": {
@@ -156,6 +157,9 @@
               "type": "integer",
               "format": "uint64",
               "minimum": 0.0
+            },
+            "capital_denom": {
+              "type": "string"
             },
             "to": {
               "$ref": "#/definitions/Addr"
@@ -180,6 +184,12 @@
             "null"
           ],
           "format": "int64"
+        },
+        "cap_d": {
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "com": {
           "type": [

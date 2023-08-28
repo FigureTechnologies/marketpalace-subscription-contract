@@ -143,10 +143,7 @@ pub fn execute(
                     if capital_sum < 0 {
                         match &state.required_capital_attribute {
                             None => {
-                                funds.push(coin(
-                                    capital_sum.unsigned_abs().into(),
-                                    capital_denom.clone(),
-                                ));
+                                funds.push(coin(capital_sum.unsigned_abs().into(), capital_denom));
                                 Ok(response)
                             }
                             Some(_required_capital_attribute) => {
@@ -613,7 +610,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(-1_000),
             commitment_in_shares: Some(-1_000),
-            capital_denom: Some(String::from("stable_coin")),
+            capital_denom: Some(String::from("restricted_capital_coin")),
             capital: Some(-1_000),
             date: None,
         };
@@ -768,7 +765,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::IssueWithdrawal {
-                capital_denom: String::from("stable_coin"),
+                capital_denom: String::from("capital_coin"),
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
             },
@@ -793,7 +790,7 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::IssueWithdrawal {
-                capital_denom: String::from("stable_coin"),
+                capital_denom: String::from("restricted_capital_coin"),
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
             },
