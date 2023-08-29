@@ -134,7 +134,7 @@ pub fn execute(
                         } else if state.like_capital_denoms.len() == 1 {
                             state.like_capital_denoms.first().unwrap().clone()
                         } else {
-                            return Err(StdError::generic_err("no capital denom")) 
+                            return Err(StdError::generic_err("no capital denom"));
                         };
 
                         *acc.entry(denom).or_insert(0) += capital_value;
@@ -147,11 +147,11 @@ pub fn execute(
             let response = total_capital_per_denom.into_iter().try_fold(
                 response,
                 |response, (capital_denom, capital_sum)| -> Result<_, StdError> {
-                    if capital_sum < 0 {
+                    Ok(if capital_sum < 0 {
                         match &state.required_capital_attribute {
                             None => {
                                 funds.push(coin(capital_sum.unsigned_abs().into(), capital_denom));
-                                Ok(response)
+                                response
                             }
                             Some(_required_capital_attribute) => {
                                 let marker_transfer = transfer_marker_coins(
@@ -160,12 +160,12 @@ pub fn execute(
                                     state.raise.clone(),
                                     env.contract.address.clone(),
                                 )?;
-                                Ok(response.add_message(marker_transfer))
+                                response.add_message(marker_transfer)
                             }
                         }
                     } else {
-                        Ok(response)
-                    }
+                        response
+                    })
                 },
             )?;
 
