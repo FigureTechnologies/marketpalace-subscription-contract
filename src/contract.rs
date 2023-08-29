@@ -51,6 +51,20 @@ pub fn execute(
                 return contract_error("only the lp can authorize asset exchanges");
             }
 
+            if state.like_capital_denoms.len() > 1 {
+                for exchange in &exchanges {
+                    if exchange.capital.is_some() {
+                        if let Some(denom_value) = &exchange.capital_denom {
+                            if !state.like_capital_denoms.contains(denom_value) {
+                                return contract_error("unsupported capital denom");
+                            }
+                        } else {
+                            return contract_error("specified capital denom required");
+                        }
+                    }
+                }
+            }
+
             let mut authorizations = asset_exchange_authorization_storage(deps.storage)
                 .may_load()?
                 .unwrap_or_default();
