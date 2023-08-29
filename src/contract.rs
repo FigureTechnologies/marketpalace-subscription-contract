@@ -192,9 +192,17 @@ pub fn execute(
                 return contract_error("only the lp can withdraw");
             }
 
-            if !state.like_capital_denoms.contains(&capital_denom) {
-                return contract_error("unsupported capital denom");
-            }
+            let capital_denom = if let Some(denom_value) = capital_denom {
+                if state.like_capital_denoms.contains(&denom_value) {
+                    denom_value
+                } else {
+                    return contract_error("unsupported capital denom");
+                }
+            } else if state.like_capital_denoms.len() == 1 {
+                state.like_capital_denoms.first().unwrap().clone()
+            } else {
+                return contract_error("no capital denom");
+            };
 
             let response = match state.required_capital_attribute {
                 None => {
@@ -772,9 +780,9 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::IssueWithdrawal {
-                capital_denom: String::from("capital_coin"),
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
             },
         )
         .unwrap();
@@ -797,9 +805,9 @@ mod tests {
             mock_env(),
             mock_info("lp", &vec![]),
             HandleMsg::IssueWithdrawal {
-                capital_denom: String::from("restricted_capital_coin"),
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
             },
         )
         .unwrap();
@@ -825,9 +833,9 @@ mod tests {
             mock_env(),
             mock_info("bad_actor", &vec![]),
             HandleMsg::IssueWithdrawal {
-                capital_denom: String::from("stable_coin"),
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
             },
         );
         assert!(res.is_err());

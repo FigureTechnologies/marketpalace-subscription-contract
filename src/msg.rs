@@ -44,9 +44,9 @@ pub enum HandleMsg {
         memo: Option<String>,
     },
     IssueWithdrawal {
-        capital_denom: String,
         to: Addr,
         amount: u64,
+        capital_denom: Option<String>,
     },
 }
 
