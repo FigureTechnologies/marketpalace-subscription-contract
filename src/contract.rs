@@ -854,4 +854,42 @@ mod tests {
         );
         assert!(res.is_err());
     }
+
+    #[test]
+    fn withdraw_required_cap_denom_not_specified() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a"), String::from("b")];
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+                capital_denom: None,
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn withdraw_unsupported_cap_denom() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a")];
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+                capital_denom: Some(String::from("b")),
+            },
+        );
+        assert!(res.is_err());
+    }
 }
