@@ -37,7 +37,7 @@ pub fn migrate(
         investment_denom: old_state.investment_denom,
         like_capital_denoms: migrate_msg.like_capital_denoms,
         capital_per_share: old_state.capital_per_share,
-        required_capital_attribute: migrate_msg.required_capital_attribute,
+        required_capital_attributes: migrate_msg.required_capital_attributes,
     };
 
     state_storage(deps.storage).save(&new_state)?;
@@ -163,6 +163,8 @@ impl Hash for Withdrawal {
 
 #[cfg(test)]
 mod tests {
+    use crate::msg::CapitalDenomRequirement;
+
     use super::*;
     use cosmwasm_std::testing::mock_env;
     use cosmwasm_storage::singleton;
@@ -190,7 +192,7 @@ mod tests {
             mock_env(),
             MigrateMsg {
                 like_capital_denoms: vec![String::from("stable_coin")],
-                required_capital_attribute: None,
+                required_capital_attributes: vec![],
             },
         )
         .unwrap();
@@ -204,7 +206,7 @@ mod tests {
                 investment_denom: String::from("investment"),
                 like_capital_denoms: vec![String::from("stable_coin")],
                 capital_per_share: 100,
-                required_capital_attribute: None,
+                required_capital_attributes: vec![],
             },
             singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
         );
@@ -227,7 +229,10 @@ mod tests {
 
         let migration_msg = MigrateMsg {
             like_capital_denoms: vec![String::from("new_denom")],
-            required_capital_attribute: Some(String::from("attr")),
+            required_capital_attributes: vec![CapitalDenomRequirement {
+                capital_denom: String::from("new_denom"),
+                required_attribute: String::from("attr"),
+            }],
         };
         migrate(deps.as_mut(), mock_env(), migration_msg).unwrap();
 
@@ -240,7 +245,10 @@ mod tests {
                 investment_denom: String::from("investment"),
                 like_capital_denoms: vec![String::from("new_denom")],
                 capital_per_share: 100,
-                required_capital_attribute: Some(String::from("attr")),
+                required_capital_attributes: vec![CapitalDenomRequirement {
+                    capital_denom: String::from("new_denom"),
+                    required_attribute: String::from("attr"),
+                }],
             },
             singleton_read(&deps.storage, CONFIG_KEY).load().unwrap()
         );
