@@ -157,12 +157,6 @@
               "format": "uint64",
               "minimum": 0.0
             },
-            "capital_denom": {
-              "type": [
-                "string",
-                "null"
-              ]
-            },
             "to": {
               "$ref": "#/definitions/Addr"
             }
@@ -186,12 +180,6 @@
             "null"
           ],
           "format": "int64"
-        },
-        "cap_d": {
-          "type": [
-            "string",
-            "null"
-          ]
         },
         "com": {
           "type": [

@@ -16,7 +16,7 @@ pub struct State {
     pub raise: Addr,
     pub commitment_denom: String,
     pub investment_denom: String,
-    pub like_capital_denoms: Vec<String>,
+    pub capital_denom: String,
     pub capital_per_share: u64,
     pub required_capital_attribute: Option<String>,
 }
@@ -70,7 +70,7 @@ pub mod tests {
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("raise_1.commitment"),
                 investment_denom: String::from("raise_1.investment"),
-                like_capital_denoms: vec![String::from("stable_coin")],
+                capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 required_capital_attribute: None,
             }
@@ -83,7 +83,7 @@ pub mod tests {
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("raise_1.commitment"),
                 investment_denom: String::from("raise_1.investment"),
-                like_capital_denoms: vec![String::from("capital_coin")],
+                capital_denom: String::from("capital_coin"),
                 capital_per_share: 100,
                 required_capital_attribute: None,
             }
@@ -96,7 +96,7 @@ pub mod tests {
                 raise: Addr::unchecked("raise_1"),
                 commitment_denom: String::from("raise_1.commitment"),
                 investment_denom: String::from("raise_1.investment"),
-                like_capital_denoms: vec![String::from("restricted_capital_coin")],
+                capital_denom: String::from("restricted_capital_coin"),
                 capital_per_share: 100,
                 required_capital_attribute: Some(String::from("capital.test")),
             }
