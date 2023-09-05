@@ -1,12 +1,13 @@
 use crate::error::contract_error;
 use crate::raise_msg::RaiseExecuteMsg;
-use cosmwasm_std::{coin, wasm_execute, Addr, Storage};
+use cosmwasm_std::{coin, wasm_execute, Addr, StdError, Storage};
 use cosmwasm_std::{
     coins, entry_point, to_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Response,
     StdResult,
 };
 use provwasm_std::{transfer_marker_coins, ProvenanceMsg};
 use provwasm_std::{ProvenanceQuerier, ProvenanceQuery};
+use std::collections::HashMap;
 use std::vec::IntoIter;
 
 use crate::error::ContractError;
@@ -22,7 +23,7 @@ pub type ContractResponse = Result<Response<ProvenanceMsg>, ContractError>;
 #[entry_point]
 pub fn execute(
     deps: DepsMut<ProvenanceQuery>,
-    _env: Env,
+    env: Env,
     info: MessageInfo,
     msg: HandleMsg,
 ) -> ContractResponse {
@@ -48,6 +49,18 @@ pub fn execute(
 
             if info.sender != state.lp {
                 return contract_error("only the lp can authorize asset exchanges");
+            }
+
+            for exchange in &exchanges {
+                if exchange.capital.is_some() {
+                    if let Some(denom_value) = &exchange.capital_denom {
+                        if !state.like_capital_denoms.contains(denom_value) {
+                            return contract_error("unsupported capital denom");
+                        }
+                    } else if state.like_capital_denoms.len() > 1 {
+                        return contract_error("specified capital denom required");
+                    }
+                }
             }
 
             let mut authorizations = asset_exchange_authorization_storage(deps.storage)
@@ -118,29 +131,55 @@ pub fn execute(
             }
 
             let response = Response::new();
-            let total_capital: i64 = exchanges.iter().filter_map(|e| e.capital).sum();
-            let response = if total_capital < 0 {
-                match state.required_capital_attribute {
-                    None => {
-                        funds.push(coin(
-                            total_capital.unsigned_abs().into(),
-                            state.capital_denom.clone(),
-                        ));
+
+            let total_capital_per_denom: HashMap<String, i64> = exchanges.iter().try_fold(
+                HashMap::new(),
+                |mut acc,
+                 AssetExchange {
+                     capital_denom,
+                     capital,
+                     ..
+                 }| {
+                    if let Some(capital_value) = capital {
+                        let denom = if let Some(denom_value) = capital_denom {
+                            denom_value.clone()
+                        } else if state.like_capital_denoms.len() == 1 {
+                            state.like_capital_denoms.first().unwrap().clone()
+                        } else {
+                            return Err(StdError::generic_err("no capital denom"));
+                        };
+
+                        *acc.entry(denom).or_insert(0) += capital_value;
+                    }
+
+                    Ok(acc)
+                },
+            )?;
+
+            let response = total_capital_per_denom.into_iter().try_fold(
+                response,
+                |response, (capital_denom, capital_sum)| -> Result<_, StdError> {
+                    Ok(if capital_sum < 0 {
+                        match &state.required_capital_attribute {
+                            None => {
+                                funds.push(coin(capital_sum.unsigned_abs().into(), capital_denom));
+                                response
+                            }
+                            Some(_required_capital_attribute) => {
+                                let marker_transfer = transfer_marker_coins(
+                                    capital_sum.unsigned_abs().into(),
+                                    &capital_denom,
+                                    state.raise.clone(),
+                                    env.contract.address.clone(),
+                                )?;
+                                response.add_message(marker_transfer)
+                            }
+                        }
+                    } else {
                         response
-                    }
-                    Some(_required_capital_attribute) => {
-                        let marker_transfer = transfer_marker_coins(
-                            total_capital.unsigned_abs().into(),
-                            &state.capital_denom,
-                            state.raise.clone(),
-                            _env.contract.address,
-                        )?;
-                        response.add_message(marker_transfer)
-                    }
-                }
-            } else {
-                response
-            };
+                    })
+                },
+            )?;
 
             funds.sort_by_key(|coin| coin.denom.clone());
 
@@ -154,18 +193,34 @@ pub fn execute(
                 funds,
             )?))
         }
-        HandleMsg::IssueWithdrawal { to, amount } => {
+        HandleMsg::IssueWithdrawal {
+            capital_denom,
+            to,
+            amount,
+        } => {
             let state = state_storage(deps.storage).load()?;
 
             if info.sender != state.lp {
                 return contract_error("only the lp can withdraw");
             }
 
+            let capital_denom = if let Some(denom_value) = capital_denom {
+                if state.like_capital_denoms.contains(&denom_value) {
+                    denom_value
+                } else {
+                    return contract_error("unsupported capital denom");
+                }
+            } else if state.like_capital_denoms.len() == 1 {
+                state.like_capital_denoms.first().unwrap().clone()
+            } else {
+                return contract_error("no capital denom");
+            };
+
             let response = match state.required_capital_attribute {
                 None => {
                     let send_capital = BankMsg::Send {
                         to_address: to.to_string(),
-                        amount: coins(amount.into(), state.capital_denom),
+                        amount: coins(amount.into(), capital_denom),
                     };
                     Response::new().add_message(send_capital)
                 }
@@ -184,9 +239,9 @@ pub fn execute(
 
                     let marker_transfer = transfer_marker_coins(
                         amount.into(),
-                        &state.capital_denom,
+                        &capital_denom,
                         to,
-                        _env.contract.address,
+                        env.contract.address,
                     )?;
                     Response::new().add_message(marker_transfer)
                 }
@@ -357,6 +412,7 @@ mod tests {
                 exchanges: vec![AssetExchange {
                     investment: Some(1_000),
                     commitment_in_shares: Some(1_000),
+                    capital_denom: Some(String::from("stable_coin")),
                     capital: Some(1_000),
                     date: None,
                 }],
@@ -388,6 +444,61 @@ mod tests {
                 exchanges: vec![AssetExchange {
                     investment: Some(1_000),
                     commitment_in_shares: Some(1_000),
+                    capital_denom: Some(String::from("stable_coin")),
+                    capital: Some(1_000),
+                    date: None,
+                }],
+                to: Some(Addr::unchecked("lp_side_account")),
+                memo: Some(String::from("memo")),
+            },
+        );
+
+        // verify error
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn authorize_asset_exchange_required_cap_denom_not_specified() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a"), String::from("b")]
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::AuthorizeAssetExchange {
+                exchanges: vec![AssetExchange {
+                    investment: Some(1_000),
+                    commitment_in_shares: Some(1_000),
+                    capital_denom: None,
+                    capital: Some(1_000),
+                    date: None,
+                }],
+                to: Some(Addr::unchecked("lp_side_account")),
+                memo: Some(String::from("memo")),
+            },
+        );
+
+        // verify error
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn authorize_asset_exchange_unsupported_denom() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a")]
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::AuthorizeAssetExchange {
+                exchanges: vec![AssetExchange {
+                    investment: Some(1_000),
+                    commitment_in_shares: Some(1_000),
+                    capital_denom: Some(String::from("b")),
                     capital: Some(1_000),
                     date: None,
                 }],
@@ -407,6 +518,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(1_000),
             commitment_in_shares: Some(1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(1_000),
             date: None,
         };
@@ -450,6 +562,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(1_000),
             commitment_in_shares: Some(1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(1_000),
             date: None,
         };
@@ -486,6 +599,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(1_000),
             commitment_in_shares: Some(1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(1_000),
             date: None,
         };
@@ -521,12 +635,66 @@ mod tests {
     }
 
     #[test]
+    fn complete_asset_exchange_accept_multiple_cap_denom() {
+        let mut deps = capital_coin_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("cap_a"), String::from("cap_b")];
+        }));
+        load_markers(&mut deps.querier);
+        let exchanges = vec![
+            AssetExchange {
+                investment: Some(1_000),
+                commitment_in_shares: Some(1_000),
+                capital_denom: Some(String::from("cap_a")),
+                capital: Some(1_000),
+                date: None,
+            },
+            AssetExchange {
+                investment: Some(1_000),
+                commitment_in_shares: Some(1_000),
+                capital_denom: Some(String::from("cap_b")),
+                capital: Some(1_000),
+                date: None,
+            },
+        ];
+        let to = Some(Addr::unchecked("lp_side_account"));
+        let memo = Some(String::from("memo"));
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::CompleteAssetExchange {
+                exchanges: exchanges.clone(),
+                to: to.clone(),
+                memo: memo.clone(),
+            },
+        )
+        .unwrap();
+
+        // verify exec message sent
+        assert_eq!(1, res.messages.len());
+        let (recipient, msg, funds) = execute_args::<RaiseExecuteMsg>(msg_at_index(&res, 0));
+        assert_eq!("raise_1", recipient);
+        assert_eq!(
+            RaiseExecuteMsg::CompleteAssetExchange {
+                exchanges: exchanges.clone(),
+                to,
+                memo
+            },
+            msg
+        );
+
+        // verify no funds sent
+        assert_eq!(0, funds.len());
+    }
+
+    #[test]
     fn complete_asset_exchange_send_only() {
         let mut deps = capital_coin_deps(None);
         load_markers(&mut deps.querier);
         let exchange = AssetExchange {
             investment: Some(-1_000),
             commitment_in_shares: Some(-1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(-1_000),
             date: None,
         };
@@ -576,6 +744,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(-1_000),
             commitment_in_shares: Some(-1_000),
+            capital_denom: Some(String::from("restricted_capital_coin")),
             capital: Some(-1_000),
             date: None,
         };
@@ -631,6 +800,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(1_000),
             commitment_in_shares: Some(1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(1_000),
             date: None,
         };
@@ -690,6 +860,7 @@ mod tests {
         let exchange = AssetExchange {
             investment: Some(1_000),
             commitment_in_shares: Some(1_000),
+            capital_denom: Some(String::from("stable_coin")),
             capital: Some(1_000),
             date: None,
         };
@@ -730,6 +901,7 @@ mod tests {
             HandleMsg::IssueWithdrawal {
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
             },
         )
         .unwrap();
@@ -754,6 +926,7 @@ mod tests {
             HandleMsg::IssueWithdrawal {
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
             },
         )
         .unwrap();
@@ -781,6 +954,45 @@ mod tests {
             HandleMsg::IssueWithdrawal {
                 to: Addr::unchecked("lp_side_account"),
                 amount: 10_000,
+                capital_denom: None,
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn withdraw_required_cap_denom_not_specified() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a"), String::from("b")];
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+                capital_denom: None,
+            },
+        );
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn withdraw_unsupported_cap_denom() {
+        let mut deps = default_deps(Some(|state| {
+            state.like_capital_denoms = vec![String::from("a")];
+        }));
+
+        let res = execute(
+            deps.as_mut(),
+            mock_env(),
+            mock_info("lp", &vec![]),
+            HandleMsg::IssueWithdrawal {
+                to: Addr::unchecked("lp_side_account"),
+                amount: 10_000,
+                capital_denom: Some(String::from("b")),
             },
         );
         assert!(res.is_err());

@@ -9,7 +9,7 @@ pub struct InstantiateMsg {
     pub lp: Addr,
     pub commitment_denom: String,
     pub investment_denom: String,
-    pub capital_denom: String,
+    pub like_capital_denoms: Vec<String>,
     pub capital_per_share: u64,
     pub initial_commitment: Option<u64>,
     pub required_capital_attribute: Option<String>,
@@ -18,7 +18,7 @@ pub struct InstantiateMsg {
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub struct MigrateMsg {
-    pub capital_denom: Option<String>,
+    pub like_capital_denoms: Vec<String>,
     pub required_capital_attribute: Option<String>,
 }
 
@@ -46,6 +46,7 @@ pub enum HandleMsg {
     IssueWithdrawal {
         to: Addr,
         amount: u64,
+        capital_denom: Option<String>,
     },
 }
 
@@ -59,6 +60,10 @@ pub struct AssetExchange {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub commitment_in_shares: Option<i64>,
+    #[serde(rename = "cap_d")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub capital_denom: Option<String>,
     #[serde(rename = "cap")]
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
