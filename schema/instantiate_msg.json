@@ -4,15 +4,18 @@
   "type": "object",
   "required": [
     "admin",
+    "capital_denom",
     "capital_per_share",
     "commitment_denom",
     "investment_denom",
-    "like_capital_denoms",
     "lp"
   ],
   "properties": {
     "admin": {
       "$ref": "#/definitions/Addr"
+    },
+    "capital_denom": {
+      "type": "string"
     },
     "capital_per_share": {
       "type": "integer",
@@ -32,12 +35,6 @@
     },
     "investment_denom": {
       "type": "string"
-    },
-    "like_capital_denoms": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
     },
     "lp": {
       "$ref": "#/definitions/Addr"

@@ -32,7 +32,7 @@ pub fn instantiate(
         lp: msg.lp.clone(),
         commitment_denom: msg.commitment_denom,
         investment_denom: msg.investment_denom,
-        like_capital_denoms: msg.like_capital_denoms,
+        capital_denom: msg.capital_denom,
         capital_per_share: msg.capital_per_share,
         required_capital_attribute: msg.required_capital_attribute,
     };
@@ -45,7 +45,6 @@ pub fn instantiate(
                 exchanges: vec![AssetExchange {
                     investment: None,
                     commitment_in_shares: Some(commitment.try_into()?),
-                    capital_denom: None,
                     capital: None,
                     date: None,
                 }],
@@ -84,7 +83,7 @@ mod tests {
                 lp: Addr::unchecked("lp"),
                 commitment_denom: String::from("raise_1.commitment"),
                 investment_denom: String::from("raise_1.investment"),
-                like_capital_denoms: vec![String::from("stable_coin")],
+                capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
                 initial_commitment: Some(100),
                 required_capital_attribute: None,
