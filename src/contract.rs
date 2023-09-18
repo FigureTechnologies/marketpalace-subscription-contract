@@ -160,12 +160,16 @@ pub fn execute(
                 response,
                 |response, (capital_denom, capital_sum)| -> Result<_, StdError> {
                     Ok(if capital_sum < 0 {
-                        match &state.required_capital_attribute {
+                        match &state
+                            .required_capital_attributes
+                            .iter()
+                            .find(|requirement| requirement.capital_denom == capital_denom)
+                        {
                             None => {
                                 funds.push(coin(capital_sum.unsigned_abs().into(), capital_denom));
                                 response
                             }
-                            Some(_required_capital_attribute) => {
+                            Some(_requirement) => {
                                 let marker_transfer = transfer_marker_coins(
                                     capital_sum.unsigned_abs().into(),
                                     &capital_denom,
@@ -216,7 +220,11 @@ pub fn execute(
                 return contract_error("no capital denom");
             };
 
-            let response = match state.required_capital_attribute {
+            let response = match state
+                .required_capital_attributes
+                .iter()
+                .find(|requirement| requirement.capital_denom == capital_denom)
+            {
                 None => {
                     let send_capital = BankMsg::Send {
                         to_address: to.to_string(),
@@ -224,14 +232,14 @@ pub fn execute(
                     };
                     Response::new().add_message(send_capital)
                 }
-                Some(required_capital_attribute) => {
+                Some(requirement) => {
                     if !query_attributes(deps, &to)
-                        .any(|attr| attr.name == required_capital_attribute)
+                        .any(|attr| attr.name == requirement.required_attribute)
                     {
                         return contract_error(
                             format!(
                                 "{} does not have required attribute of {}",
-                                &to, &required_capital_attribute
+                                &to, &requirement.required_attribute
                             )
                             .as_str(),
                         );

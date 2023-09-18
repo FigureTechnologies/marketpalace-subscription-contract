@@ -34,7 +34,7 @@ pub fn instantiate(
         investment_denom: msg.investment_denom,
         like_capital_denoms: msg.like_capital_denoms,
         capital_per_share: msg.capital_per_share,
-        required_capital_attribute: msg.required_capital_attribute,
+        required_capital_attributes: msg.required_capital_attributes,
     };
 
     state_storage(deps.storage).save(&state)?;
@@ -87,7 +87,7 @@ mod tests {
                 like_capital_denoms: vec![String::from("stable_coin")],
                 capital_per_share: 100,
                 initial_commitment: Some(100),
-                required_capital_attribute: None,
+                required_capital_attributes: vec![],
             },
         )
         .unwrap();

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use cosmwasm_std::{Addr, Storage};
 use cosmwasm_storage::{singleton, singleton_read, ReadonlySingleton, Singleton};
 
-use crate::msg::AssetExchange;
+use crate::msg::{AssetExchange, CapitalDenomRequirement};
 
 pub static CONFIG_KEY: &[u8] = b"config";
 pub static ASSET_EXCHANGE_AUTHORIZATION_KEY: &[u8] = b"asset_exchange_authorizations";
@@ -18,7 +18,7 @@ pub struct State {
     pub investment_denom: String,
     pub like_capital_denoms: Vec<String>,
     pub capital_per_share: u64,
-    pub required_capital_attribute: Option<String>,
+    pub required_capital_attributes: Vec<CapitalDenomRequirement>,
 }
 
 impl State {
@@ -72,7 +72,7 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 like_capital_denoms: vec![String::from("stable_coin")],
                 capital_per_share: 100,
-                required_capital_attribute: None,
+                required_capital_attributes: vec![],
             }
         }
 
@@ -85,7 +85,7 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 like_capital_denoms: vec![String::from("capital_coin")],
                 capital_per_share: 100,
-                required_capital_attribute: None,
+                required_capital_attributes: vec![],
             }
         }
 
@@ -98,7 +98,10 @@ pub mod tests {
                 investment_denom: String::from("raise_1.investment"),
                 like_capital_denoms: vec![String::from("restricted_capital_coin")],
                 capital_per_share: 100,
-                required_capital_attribute: Some(String::from("capital.test")),
+                required_capital_attributes: vec![CapitalDenomRequirement {
+                    capital_denom: String::from("restricted_capital_coin"),
+                    required_attribute: String::from("capital.test"),
+                }],
             }
         }
     }
