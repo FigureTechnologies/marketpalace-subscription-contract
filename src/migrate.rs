@@ -1,5 +1,6 @@
 use std::hash::Hash;
 
+use crate::error::contract_error;
 use crate::error::ContractError;
 use crate::msg::MigrateMsg;
 use crate::state::state_storage;
@@ -13,6 +14,7 @@ use cosmwasm_std::DepsMut;
 use cosmwasm_std::Env;
 use cosmwasm_std::Response;
 use cosmwasm_storage::singleton_read;
+use cw2::get_contract_version;
 use cw2::set_contract_version;
 use provwasm_std::ProvenanceMsg;
 use provwasm_std::ProvenanceQuery;
@@ -25,35 +27,37 @@ pub fn migrate(
     _: Env,
     migrate_msg: MigrateMsg,
 ) -> Result<Response<ProvenanceMsg>, ContractError> {
+    let contract_info = get_contract_version(deps.storage)?;
+
+    match contract_info.version.as_str() {
+        "2.3.0" => {}
+        "2.2.0" => {
+            let old_state: StateV2_2_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
+
+            let new_state = State {
+                admin: old_state.admin,
+                lp: old_state.lp,
+                raise: old_state.raise.clone(),
+                commitment_denom: old_state.commitment_denom,
+                investment_denom: old_state.investment_denom,
+                like_capital_denoms: migrate_msg.like_capital_denoms,
+                capital_per_share: old_state.capital_per_share,
+                required_capital_attributes: migrate_msg.required_capital_attributes,
+            };
+
+            state_storage(deps.storage).save(&new_state)?;
+        }
+        _ => {
+            return contract_error(&format!(
+                "existing contract version not supported for migration to {}",
+                contract_info.version
+            ));
+        }
+    }
+
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let old_state: StateV2_0_0 = singleton_read(deps.storage, CONFIG_KEY).load()?;
-
-    let new_state = State {
-        admin: old_state.admin,
-        lp: old_state.lp,
-        raise: old_state.raise.clone(),
-        commitment_denom: old_state.commitment_denom,
-        investment_denom: old_state.investment_denom,
-        like_capital_denoms: migrate_msg.like_capital_denoms,
-        capital_per_share: old_state.capital_per_share,
-        required_capital_attributes: migrate_msg.required_capital_attributes,
-    };
-
-    state_storage(deps.storage).save(&new_state)?;
-
     Ok(Response::default())
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
-pub struct StateV2_0_0 {
-    pub admin: Addr,
-    pub lp: Addr,
-    pub raise: Addr,
-    pub commitment_denom: String,
-    pub investment_denom: String,
-    pub capital_denom: String,
-    pub capital_per_share: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -170,13 +174,12 @@ mod tests {
     use cosmwasm_storage::singleton;
     use provwasm_mocks::mock_dependencies;
 
-    use super::StateV2_0_0;
-
     #[test]
     fn migration() {
         let mut deps = mock_dependencies(&[]);
+        set_contract_version(&mut deps.storage, "TEST", "2.2.0").unwrap();
         singleton(&mut deps.storage, CONFIG_KEY)
-            .save(&StateV2_0_0 {
+            .save(&StateV2_2_0 {
                 admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
@@ -184,6 +187,7 @@ mod tests {
                 investment_denom: "investment".to_string(),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: None,
             })
             .unwrap();
 
@@ -215,8 +219,9 @@ mod tests {
     #[test]
     fn migration_with_capital_denom_and_attribute() {
         let mut deps = mock_dependencies(&[]);
+        set_contract_version(&mut deps.storage, "TEST", "2.2.0").unwrap();
         singleton(&mut deps.storage, CONFIG_KEY)
-            .save(&StateV2_0_0 {
+            .save(&StateV2_2_0 {
                 admin: Addr::unchecked("marketpalace"),
                 lp: Addr::unchecked("lp"),
                 raise: Addr::unchecked("raise_1"),
@@ -224,6 +229,7 @@ mod tests {
                 investment_denom: "investment".to_string(),
                 capital_denom: String::from("stable_coin"),
                 capital_per_share: 100,
+                required_capital_attribute: Some(String::from("attr")),
             })
             .unwrap();
 
